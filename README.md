@@ -2,6 +2,28 @@
 
 基于 Jetpack Compose 开发的校园水控与生活服务 Android 客户端，支持热水器、直饮水机控制以及吹风机等账单查询。
 
+<p align="center">
+  <img src="assets/showcase.jpg" alt="MudLife 界面预览" width="100%" />
+</p>
+
+<details>
+<summary><b>🌙 点击展开查看：夜间深色模式与特色功能细节（共 6 张）</b></summary>
+<br>
+
+#### 夜间深色模式
+
+| 1. 登录认证 | 2. 常用出水 | 3. 消费账单 | 4. 账号与卡密 |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/dark_login.jpg" width="220" /> | <img src="assets/dark_home.jpg" width="220" /> | <img src="assets/dark_bills.jpg" width="220" /> | <img src="assets/dark_account.jpg" width="220" /> |
+
+#### 特色功能与弹窗
+
+| 后勤管理员快捷登录 | 吹风机使用码快速更换 |
+| :---: | :---: |
+| <img src="assets/dialog_logistics.jpg" width="260" /> | <img src="assets/dialog_dryer_code.jpg" width="260" /> |
+
+</details>
+
 ---
 
 ## 主要功能
@@ -55,7 +77,7 @@
 
 ---
 
-*致敬 [yehu-imei/linyu](https://github.com/yehu-imei/linyu) 项目，感谢其早期打下的开源基础。*
+*特别致敬 [yehu-imei/linyu](https://github.com/yehu-imei/linyu) 项目，感谢其在早期通信研究上打下的开源基础。*
 
 ## 许可证
 
