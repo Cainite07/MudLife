@@ -55,7 +55,7 @@
 
 ---
 
-*特别致敬 [yehu-imei/linyu](https://github.com/yehu-imei/linyu) 项目，感谢其在早期通信研究上打下的开源基础。*
+*致敬 [yehu-imei/linyu](https://github.com/yehu-imei/linyu) 项目，感谢其早期打下的开源基础。*
 
 ## 许可证
 
