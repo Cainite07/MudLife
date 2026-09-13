@@ -1,0 +1,13 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.LinYu" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#2563EB</item>
+        <item name="colorPrimaryVariant">#1D4ED8</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">#6B7280</item>
+        <item name="colorSecondaryVariant">#4B5563</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="android:windowBackground">#12161F</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

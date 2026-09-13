@@ -1,0 +1,50 @@
+name: Build MudLife APK
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Setup Keystore for Release
+        run: |
+          if [ ! -f release.jks ]; then
+            keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 \
+              -alias mudlife -storepass 123456 -keypass 123456 \
+              -dname "CN=MudLife, OU=MudLife, O=MudLife, L=Zhenjiang, S=Jiangsu, C=CN"
+          fi
+          echo "KEYSTORE_FILE=../release.jks" >> local.properties
+          echo "KEYSTORE_PASSWORD=123456" >> local.properties
+          echo "KEY_ALIAS=mudlife" >> local.properties
+          echo "KEY_PASSWORD=123456" >> local.properties
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mudlife-release
+          path: app/build/outputs/apk/release/*.apk
