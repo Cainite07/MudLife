@@ -55,6 +55,11 @@
 
 ---
 
+
+---
+
+*特别致敬 [yehu-imei/linyu](https://github.com/yehu-imei/linyu) 项目，感谢其在早期通信研究上打下的开源基础。*
+
 ## 许可证
 
 本项目基于 MIT License 开源。仅供学习交流与个人研究使用。
