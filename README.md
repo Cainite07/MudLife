@@ -30,7 +30,7 @@
 
 ### 1. 全区全品类账单聚合
 - 支持高校多项目账户自动寻址与并发查询；
-- 兼容 `laundryBillDTO` 与 `thirdTradeMoney`，获取支付宝免密代扣的吹风机流水；
+- 兼容 `laundryBillDTO` 与 `thirdTradeMoney`，获取饮水机、吹风机与洗浴流水；
 - 自动过滤充值记录，按消费时间去重排序。
 
 ### 2. 设备控制
