@@ -12,13 +12,13 @@
 
 #### 夜间深色模式
 
-| 1. 登录认证 | 2. 常用出水 | 3. 消费账单 | 4. 账号与卡密 |
+| 1. 登录认证 | 2. 常用出水 | 3. 消费账单 | 4. 账号卡密 |
 | :---: | :---: | :---: | :---: |
 | <img src="assets/dark_login.jpg" width="220" /> | <img src="assets/dark_home.jpg" width="220" /> | <img src="assets/dark_bills.jpg" width="220" /> | <img src="assets/dark_account.jpg" width="220" /> |
 
 #### 特色功能与弹窗
 
-| 后勤管理员快捷登录 | 吹风机使用码快速更换 |
+| 后勤洗浴码登录 | 吹风机使用码更换 |
 | :---: | :---: |
 | <img src="assets/dialog_logistics.jpg" width="260" /> | <img src="assets/dialog_dryer_code.jpg" width="260" /> |
 
