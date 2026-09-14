@@ -103,6 +103,13 @@ class MainViewModel : ViewModel() {
     )
     var campusCardBalanceTime by mutableStateOf(PrefsHelper.campusCardBalanceTime)
 
+    // ── 吹风机使用码 20 次抽选架构 ──
+    var candidateUseCode by mutableStateOf("")
+    var remainUseCodeTimes by mutableStateOf(20)
+    var isRollingUseCode by mutableStateOf(false)
+    var showDryerCodeModal by mutableStateOf(false)
+    private var useCodeLastConfirmedAt by mutableStateOf(0L)
+
     // ── 后勤热水使用码 (江大专区) ──
     var qzhqUseCodeData by mutableStateOf<com.hualala.linyu.model.QzhqUseCodeData?>(
         if (PrefsHelper.qzhqRandomCode.isNotEmpty()) {
@@ -851,10 +858,22 @@ class MainViewModel : ViewModel() {
             try {
                 val resp = NetworkModule.apiService.getUseCodeSafe()
                 if (resp.success && resp.data != null) {
-                    useCodeData = resp.data
-                    if (resp.data.useCode.isNotEmpty()) {
-                        PrefsHelper.useCode = resp.data.useCode
-                        PrefsHelper.useCodeStatus = resp.data.useCodeStatus == 1
+                    // 防旧缓存回滚保护：5分钟内刚刚确认的新码，若远端返回旧码，不予覆盖
+                    val isRecentlyConfirmed = (System.currentTimeMillis() - useCodeLastConfirmedAt) < 5 * 60 * 1000L
+                    val remoteCode = resp.data.useCode
+                    if (isRecentlyConfirmed && remoteCode != PrefsHelper.useCode && PrefsHelper.useCode.isNotEmpty()) {
+                        com.hualala.linyu.utils.AppLogger.i("UseCode", "远端返回旧码 $remoteCode，本地新码 ${PrefsHelper.useCode} 受时间戳保护不予覆盖")
+                        useCodeData = useCodeData?.copy(useCodeStatus = resp.data.useCodeStatus)
+                            ?: resp.data.copy(useCode = PrefsHelper.useCode)
+                    } else {
+                        useCodeData = resp.data
+                        if (resp.data.useCode.isNotEmpty()) {
+                            PrefsHelper.useCode = resp.data.useCode
+                            PrefsHelper.useCodeStatus = resp.data.useCodeStatus == 1
+                        }
+                    }
+                    if (resp.data.remainTimes in 0..20) {
+                        remainUseCodeTimes = resp.data.remainTimes
                     }
                 }
             } catch (_: Exception) {}
@@ -880,22 +899,72 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun generateNewUseCode() {
+    fun openDryerCodeModal() {
+        showDryerCodeModal = true
+        if (candidateUseCode.isEmpty()) {
+            if (remainUseCodeTimes > 0) {
+                rollNewUseCode()
+            } else {
+                candidateUseCode = PrefsHelper.useCode
+            }
+        }
+    }
+
+    fun closeDryerCodeModal() {
+        showDryerCodeModal = false
+        candidateUseCode = ""
+    }
+
+    fun rollNewUseCode() {
+        if (isRollingUseCode) return
+        if (remainUseCodeTimes <= 0) {
+            toastMessage = "今日抽选机会已用尽"
+            return
+        }
         viewModelScope.launch {
+            isRollingUseCode = true
             try {
                 val resp = NetworkModule.apiService.generateUseCodeSafe(NetworkModule.authFields())
                 if (resp.success && resp.data != null) {
-                    useCodeData = resp.data
                     if (resp.data.useCode.isNotEmpty()) {
-                        PrefsHelper.useCode = resp.data.useCode
-                        PrefsHelper.useCodeStatus = resp.data.useCodeStatus == 1
+                        candidateUseCode = resp.data.useCode
                     }
-                    toastMessage = "已成功生成新的吹风机使用码"
+                    if (resp.data.remainTimes in 0..20) {
+                        remainUseCodeTimes = resp.data.remainTimes
+                    } else if (remainUseCodeTimes > 0) {
+                        remainUseCodeTimes--
+                    }
                 } else {
-                    toastMessage = resp.displayMessage.orEmpty().ifEmpty { "生成新码失败" }
+                    toastMessage = resp.displayMessage.orEmpty().ifEmpty { "抽选新码失败" }
                 }
             } catch (_: Exception) {
                 toastMessage = "网络请求失败，请检查网络"
+            } finally {
+                isRollingUseCode = false
+            }
+        }
+    }
+
+    fun confirmUseCandidateCode() {
+        val codeToSave = candidateUseCode.ifEmpty { return }
+        viewModelScope.launch {
+            try {
+                // 1. 本地立即生效并持久化，保持原有开启状态
+                useCodeData = (useCodeData ?: UseCodeData()).copy(
+                    useCode = codeToSave,
+                    useCodeStatus = 1
+                )
+                PrefsHelper.useCode = codeToSave
+                PrefsHelper.useCodeStatus = true
+                useCodeLastConfirmedAt = System.currentTimeMillis()
+                showDryerCodeModal = false
+                candidateUseCode = ""
+
+                // 2. 链式调用服务端状态激活接口，确保服务端白名单与硬件同步
+                NetworkModule.apiService.updateUseCodeStatusSafe(1, NetworkModule.authFields())
+                toastMessage = "已成功更换并激活吹风机码"
+            } catch (_: Exception) {
+                toastMessage = "激活新码网络异常，请检查网络"
             }
         }
     }

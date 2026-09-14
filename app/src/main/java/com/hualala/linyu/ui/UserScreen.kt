@@ -55,7 +55,6 @@ fun UserScreen(
     var showChangeCodeDialog by remember { mutableStateOf(false) }
     var showQzhqLoginDialog by remember { mutableStateOf(false) }
     var showLogViewerDialog by remember { mutableStateOf(false) }
-    var showRegenDryerCodeDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -296,7 +295,7 @@ fun UserScreen(
                     TextButton(
                         onClick = {
                             HapticHelper.click(context)
-                            showRegenDryerCodeDialog = true
+                            viewModel?.openDryerCodeModal()
                         },
                         contentPadding = PaddingValues(horizontal = 6.dp)
                     ) {
@@ -464,29 +463,121 @@ fun UserScreen(
         Spacer(Modifier.height(100.dp))
     }
 
-    if (showRegenDryerCodeDialog) {
+    if (viewModel?.showDryerCodeModal == true) {
+        val candidateCode = viewModel.candidateUseCode.ifEmpty {
+            viewModel.useCodeData?.useCode?.ifEmpty { null } ?: PrefsHelper.useCode
+        }
+        val remainTimes = viewModel.remainUseCodeTimes
+        val isRolling = viewModel.isRollingUseCode
+
         AlertDialog(
-            onDismissRequest = { showRegenDryerCodeDialog = false },
-            title = { Text("更换吹风机使用码", fontWeight = FontWeight.Bold) },
-            text = { Text("确定要重新生成新的吹风机使用码吗？生成后旧码将立即失效。") },
+            onDismissRequest = { viewModel.closeDryerCodeModal() },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("更换吹风机使用码", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (remainTimes <= 3) AppColors.Warning.copy(alpha = 0.15f) else AppColors.Accent.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, if (remainTimes <= 3) AppColors.Warning.copy(alpha = 0.3f) else AppColors.Accent.copy(alpha = 0.25f))
+                    ) {
+                        Text(
+                            text = "剩余 $remainTimes/20 次",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (remainTimes <= 3) AppColors.Warning else AppColors.Accent,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = AppColors.Card,
+                        border = BorderStroke(1.dp, AppColors.Border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp, horizontal = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "候选使用码",
+                                fontSize = 11.sp,
+                                color = AppColors.TextSecondary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            if (isRolling) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(28.dp),
+                                    strokeWidth = 2.5.dp,
+                                    color = AppColors.Accent
+                                )
+                            } else {
+                                Text(
+                                    text = candidateCode.ifEmpty { "--------" },
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 3.5.sp,
+                                    color = AppColors.Accent
+                                )
+                            }
+                        }
+                    }
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         HapticHelper.click(context)
-                        showRegenDryerCodeDialog = false
-                        viewModel?.generateNewUseCode()
+                        viewModel.confirmUseCandidateCode()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Accent)
+                    enabled = candidateCode.isNotEmpty() && !isRolling,
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Accent),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(
-                        "确认更换",
+                        "确认使用",
                         color = if (isDark) Color(0xFF062E6F) else Color.White,
                         fontWeight = FontWeight.Bold
                     )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showRegenDryerCodeDialog = false }) { Text("取消") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { viewModel.closeDryerCodeModal() }) {
+                        Text("取消", color = AppColors.TextSecondary)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    OutlinedButton(
+                        onClick = {
+                            HapticHelper.click(context)
+                            viewModel.rollNewUseCode()
+                        },
+                        enabled = remainTimes > 0 && !isRolling,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, AppColors.Accent.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = if (remainTimes > 0) "换一个" else "已用尽",
+                            color = AppColors.Accent,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             },
             shape = RoundedCornerShape(22.dp),
             containerColor = AppColors.SolidSurface

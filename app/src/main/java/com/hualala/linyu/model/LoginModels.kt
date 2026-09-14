@@ -135,7 +135,8 @@ data class UseCodeData(
     val useCodeStatus: Int = 0,
     val useCodeRandom: String = "",
     val resetAvailability: Int = 0,
-    val resetAvailabilityWarMark: String? = null
+    val resetAvailabilityWarMark: String? = null,
+    val remainTimes: Int = 20
 )
 
 data class BillDetail(
