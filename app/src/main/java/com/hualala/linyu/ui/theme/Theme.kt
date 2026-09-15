@@ -11,7 +11,7 @@ enum class ThemeMode { LIGHT, DARK }
 // ── Light palette (现代 MD3 浅色清新充盈灵透白玉调色) ──
 val LightColors = AppColorSet(
     Background = Color(0xFFF1F5F9), // 清新珍珠浅底
-    Card = Color(0xB8FFFFFF),       // 72% 高透亚克力灵透纯白
+    Card = Color(0xFFFFFFFF),       // 100% 高纯白玉实体，清晰挺拔立于背景之上
     SolidSurface = Color(0xFFFFFFFF),// 100% 纯白实体，彻底杜绝叠加透视
     Primary = Color(0xFF0F172A),
     Accent = Color(0xFF1E40AF),
@@ -19,14 +19,14 @@ val LightColors = AppColorSet(
     TextSecondary = Color(0xFF64748B),
     Success = Color(0xFF16A34A), Warning = Color(0xFFD97706),
     Danger = Color(0xFFDC2626), ActiveBg = Color(0x201E40AF),
-    SurfaceVariant = Color(0xEEF1F5F9), Border = Color(0xD0FFFFFF), // 晶体微光高光描边
+    SurfaceVariant = Color(0xEEF1F5F9), Border = Color(0x140F172A), // 细致灰晶微光描边
     isDark = false
 )
 
 // ── Dark palette (现代 MD3 深度星空微透磨砂调色) ──
 val DarkColors = AppColorSet(
     Background = Color(0xFF0E131D), // 极具纵深的沉浸墨底色
-    Card = Color(0xBF1D232E),       // 75% 磨砂亚克力微透卡片色
+    Card = Color(0xFF161D29),       // 100% 实体黑曜石深邃卡片色，明度层次鲜明
     SolidSurface = Color(0xFF1E2430),// 100% 实体暗色，彻底杜绝叠加透视
     Primary = Color(0xFFFFFFFF),
     Accent = Color(0xFFA8C7FA),
@@ -34,7 +34,7 @@ val DarkColors = AppColorSet(
     TextSecondary = Color(0xFF94A3B8),
     Success = Color(0xFF34D399), Warning = Color(0xFFFBBF24),
     Danger = Color(0xFFF87171), ActiveBg = Color(0x301E293B),
-    SurfaceVariant = Color(0xCC242C3A), Border = Color(0x22FFFFFF),
+    SurfaceVariant = Color(0xCC242C3A), Border = Color(0x20FFFFFF), // 高光晶体物理微描边
     isDark = true
 )
 

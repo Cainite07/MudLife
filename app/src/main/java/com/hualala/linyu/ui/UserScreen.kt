@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +24,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.hualala.linyu.ui.theme.*
 import com.hualala.linyu.utils.HapticHelper
 import com.hualala.linyu.utils.PrefsHelper
+import com.hualala.linyu.utils.UpdateManager
 
 @Composable
 fun UserScreen(
@@ -111,7 +115,7 @@ fun UserScreen(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = AppColors.Card),
             border = BorderStroke(1.dp, AppColors.Border),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 InfoRow("姓名", PrefsHelper.userName.ifEmpty { "江大学子" })
@@ -131,7 +135,7 @@ fun UserScreen(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = AppColors.Card),
             border = BorderStroke(1.dp, AppColors.Border),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // 标题栏：极简无括号
@@ -276,7 +280,7 @@ fun UserScreen(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = AppColors.Card),
             border = BorderStroke(1.dp, AppColors.Border),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // 标题栏：极简无括号
@@ -374,7 +378,7 @@ fun UserScreen(
             }
         }
 
-        // 6. 运行与诊断日志入口卡片 (精美收敛)
+        // 6. 运行与诊断日志入口卡片 (极简素雅线框)
         Card(
             onClick = {
                 HapticHelper.tick(context)
@@ -384,7 +388,7 @@ fun UserScreen(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = AppColors.Card),
             border = BorderStroke(1.dp, AppColors.Border),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -397,37 +401,137 @@ fun UserScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("🛠️", fontSize = 18.sp)
+                    Icon(
+                        imageVector = Icons.Outlined.ReceiptLong,
+                        contentDescription = "运行与诊断日志",
+                        tint = AppColors.TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "运行与诊断日志",
+                        color = AppColors.TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    val logVersion = com.hualala.linyu.utils.AppLogger.versionState
+                    val errCount = remember(logVersion) { com.hualala.linyu.utils.AppLogger.getErrorCount() }
+                    if (errCount > 0) {
+                        Surface(
+                            color = AppColors.Danger.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                "${errCount}条异常",
+                                color = AppColors.Danger,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                Text("›", fontSize = 16.sp, color = AppColors.TextSecondary, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // 7. 检查更新卡片 (极简素雅线框)
+        Card(
+            onClick = {
+                HapticHelper.tick(context)
+                viewModel?.checkUpdate(isManual = true)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = AppColors.Card),
+            border = BorderStroke(1.dp, AppColors.Border),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.SystemUpdate,
+                        contentDescription = "检查更新",
+                        tint = AppColors.TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "检查更新",
+                        color = AppColors.TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = if (isDark) Color(0x18FFFFFF) else Color(0x0C000000),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            "v${com.hualala.linyu.BuildConfig.VERSION_NAME}",
+                            color = AppColors.TextSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text("›", fontSize = 16.sp, color = AppColors.TextSecondary, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // 8. 查看源代码卡片 (低调纯粹)
+        Card(
+            onClick = {
+                HapticHelper.tick(context)
+                UpdateManager.openBrowser(context, "https://github.com/Cainite07/MudLife")
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = AppColors.Card),
+            border = BorderStroke(1.dp, AppColors.Border),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        painter = painterResource(com.hualala.linyu.R.drawable.ic_github),
+                        contentDescription = "GitHub",
+                        tint = AppColors.TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "运行与报错日志",
-                                color = AppColors.TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            val logVersion = com.hualala.linyu.utils.AppLogger.versionState
-                            val errCount = remember(logVersion) { com.hualala.linyu.utils.AppLogger.getErrorCount() }
-                            if (errCount > 0) {
-                                Surface(
-                                    color = AppColors.Danger.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text(
-                                        "${errCount}条异常",
-                                        color = AppColors.Danger,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
+                        Text(
+                            "查看源代码",
+                            color = AppColors.TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "遇到问题？一键查看或复制核心诊断日志",
+                            "在Github上查看源代码",
                             color = AppColors.TextSecondary,
                             fontSize = 10.sp
                         )
@@ -631,6 +735,97 @@ fun UserScreen(
                     onSent(success)
                 }
             }
+        )
+    }
+
+    if (viewModel?.showUpdateDialog == true) {
+        val info = viewModel.updateInfo
+        val isDownloading = viewModel.isDownloadingUpdate
+        val progress = viewModel.downloadProgress
+
+        AlertDialog(
+            onDismissRequest = { viewModel.closeUpdateDialog() },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("发现新版本", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    info?.versionName?.let { ver ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AppColors.Accent.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, AppColors.Accent.copy(alpha = 0.25f))
+                        ) {
+                            Text(
+                                text = "v$ver",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AppColors.Accent,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (!info?.changelog.isNullOrBlank()) {
+                        Text(
+                            text = info?.changelog ?: "",
+                            fontSize = 13.sp,
+                            color = AppColors.TextPrimary,
+                            lineHeight = 19.sp
+                        )
+                    }
+                    if (isDownloading) {
+                        Spacer(Modifier.height(14.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = AppColors.Accent,
+                            trackColor = if (isDark) Color(0x20FFFFFF) else Color(0x10000000)
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "正在下载 ${(progress * 100).toInt()}%",
+                            fontSize = 11.sp,
+                            color = AppColors.TextSecondary,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        HapticHelper.click(context)
+                        viewModel.startDownloadUpdate(context)
+                    },
+                    enabled = !isDownloading,
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Accent),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(
+                        if (isDownloading) "下载中..." else "立即更新",
+                        color = if (isDark) Color(0xFF062E6F) else Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                if (!isDownloading) {
+                    TextButton(onClick = { viewModel.closeUpdateDialog() }) {
+                        Text("稍后", color = AppColors.TextSecondary)
+                    }
+                }
+            },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = AppColors.SolidSurface
         )
     }
 }

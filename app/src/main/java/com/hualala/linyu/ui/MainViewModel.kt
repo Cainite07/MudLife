@@ -110,6 +110,13 @@ class MainViewModel : ViewModel() {
     var showDryerCodeModal by mutableStateOf(false)
     private var useCodeLastConfirmedAt by mutableStateOf(0L)
 
+    // ── 国内免翻墙检查更新架构 ──
+    var isCheckingUpdate by mutableStateOf(false)
+    var updateInfo by mutableStateOf<com.hualala.linyu.utils.UpdateInfo?>(null)
+    var showUpdateDialog by mutableStateOf(false)
+    var isDownloadingUpdate by mutableStateOf(false)
+    var downloadProgress by mutableStateOf(0f)
+
     // ── 后勤热水使用码 (江大专区) ──
     var qzhqUseCodeData by mutableStateOf<com.hualala.linyu.model.QzhqUseCodeData?>(
         if (PrefsHelper.qzhqRandomCode.isNotEmpty()) {
@@ -969,6 +976,72 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    // ── 国内免翻墙检查更新方法 ──
+    fun checkUpdate(isManual: Boolean = false) {
+        if (isCheckingUpdate) return
+        if (isManual) {
+            toastMessage = "正在检测更新..."
+        }
+        viewModelScope.launch {
+            isCheckingUpdate = true
+            try {
+                val result = com.hualala.linyu.utils.UpdateManager.checkUpdate()
+                if (result.isSuccess) {
+                    val info = result.getOrNull()
+                    if (info != null && info.hasUpdate) {
+                        updateInfo = info
+                        showUpdateDialog = true
+                    } else if (isManual) {
+                        toastMessage = "当前已是最新版本"
+                    }
+                } else if (isManual) {
+                    toastMessage = "检测更新失败，请检查网络后重试"
+                }
+            } catch (_: Exception) {
+                if (isManual) toastMessage = "检测更新异常"
+            } finally {
+                isCheckingUpdate = false
+            }
+        }
+    }
+
+    fun closeUpdateDialog() {
+        if (!isDownloadingUpdate) {
+            showUpdateDialog = false
+        }
+    }
+
+    fun startDownloadUpdate(context: android.content.Context) {
+        val info = updateInfo ?: return
+        if (isDownloadingUpdate) return
+        viewModelScope.launch {
+            isDownloadingUpdate = true
+            downloadProgress = 0f
+            try {
+                val result = com.hualala.linyu.utils.UpdateManager.downloadApk(context, info) { progress ->
+                    downloadProgress = progress
+                }
+                if (result.isSuccess) {
+                    val file = result.getOrNull()
+                    if (file != null) {
+                        showUpdateDialog = false
+                        com.hualala.linyu.utils.UpdateManager.installApk(context, file)
+                    } else {
+                        toastMessage = "安装包解析异常"
+                    }
+                } else {
+                    toastMessage = "下载更新失败，正在为您调起浏览器直接下载"
+                    val fallbackUrl = info.mirrors.firstOrNull() ?: info.downloadUrl
+                    com.hualala.linyu.utils.UpdateManager.openBrowser(context, fallbackUrl)
+                }
+            } catch (_: Exception) {
+                toastMessage = "下载更新异常"
+            } finally {
+                isDownloadingUpdate = false
+            }
+        }
+    }
+
     // ── 后勤洗浴使用码控制 (江大专区) ──
     fun loadQzhqUseCode() {
         val phone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }
@@ -1313,6 +1386,56 @@ class MainViewModel : ViewModel() {
                 }
             }
             finally { isLoadingBills = false }
+        }
+    }
+
+    // ── 极简免翻墙检查更新 ──
+    fun checkUpdate(isManual: Boolean = false) {
+        if (isCheckingUpdate) return
+        viewModelScope.launch {
+            isCheckingUpdate = true
+            if (isManual) {
+                toastMessage = "正在检测更新..."
+            }
+            val result = com.hualala.linyu.utils.UpdateManager.checkUpdate()
+            result.onSuccess { info ->
+                updateInfo = info
+                if (info.hasUpdate) {
+                    showUpdateDialog = true
+                } else if (isManual) {
+                    toastMessage = "当前已是最新版本"
+                }
+            }.onFailure { e ->
+                if (isManual) {
+                    toastMessage = e.message ?: "检测更新失败，请重试"
+                }
+            }
+            isCheckingUpdate = false
+        }
+    }
+
+    fun startDownloadUpdate(context: Context) {
+        val info = updateInfo ?: return
+        if (isDownloadingUpdate) return
+        viewModelScope.launch {
+            isDownloadingUpdate = true
+            downloadProgress = 0f
+            val res = com.hualala.linyu.utils.UpdateManager.downloadApk(context, info) { progress ->
+                downloadProgress = progress
+            }
+            isDownloadingUpdate = false
+            res.onSuccess { file ->
+                showUpdateDialog = false
+                com.hualala.linyu.utils.UpdateManager.installApk(context, file)
+            }.onFailure { err ->
+                toastMessage = "下载安装包失败: ${err.message}"
+            }
+        }
+    }
+
+    fun closeUpdateDialog() {
+        if (!isDownloadingUpdate) {
+            showUpdateDialog = false
         }
     }
 }

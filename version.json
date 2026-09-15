@@ -1,0 +1,12 @@
+{
+  "versionCode": 22,
+  "versionName": "1.3.14",
+  "releaseDate": "2026-09-15",
+  "title": "v1.3.14 (Build 22)",
+  "changelog": "1. 全面优化“我的”页面卡片材质，增强与背景的对比度与层次质感；\n2. 引入极简素雅系统级矢量图标体系；\n3. 新增国内免翻墙多通道高速检查更新与版本升级支持；\n4. 新增低调查看源代码入口。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.3.14/mudlife-v1.3.14.apk",
+  "mirrors": [
+    "https://ghfast.top/https://github.com/Cainite07/MudLife/releases/download/v1.3.14/mudlife-v1.3.14.apk",
+    "https://ghproxy.net/https://github.com/Cainite07/MudLife/releases/download/v1.3.14/mudlife-v1.3.14.apk"
+  ]
+}
