@@ -72,7 +72,7 @@
 ```
 app/src/main/
 ├── AndroidManifest.xml                    # 应用清单，权限声明
-├── java/com/hualala/linyu/
+├── java/cn/mudlife/app/
 │   ├── MainActivity.kt                    # 主 Activity，导航、弹窗、主题管理
 │   ├── QrScanActivity.kt                  # 扫码界面（CameraX + ML Kit + 手电筒）
 │   │
@@ -103,7 +103,7 @@ app/src/main/
 │   │   ├── WalletScreen.kt                # 钱包页面（余额估算、账单列表、下拉刷新）
 │   │   ├── UserScreen.kt                  # 我的页面（账号信息、使用码、绑定寝室、主题）
 │   │   ├── DeviceDetailDialog.kt          # 设备详情弹窗（SN、MAC、预扣金额、状态）
-│   │   ├── LinYuToast.kt                  # 自定义 Toast 组件（应用图标 + 深色背景）
+│   │   ├── MudLifeToast.kt                # 自定义 Toast 组件（应用图标 + 悬浮胶囊背景）
 │   │   └── theme/
 │   │       └── Theme.kt                   # 深浅主题配色方案
 │   │

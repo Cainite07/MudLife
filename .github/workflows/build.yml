@@ -30,12 +30,12 @@ jobs:
 
       - name: Setup Keystore for Release
         run: |
-          if [ ! -f release.jks ]; then
-            keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 \
+          if [ ! -f mudlife.jks ]; then
+            keytool -genkeypair -v -keystore mudlife.jks -storetype PKCS12 -keyalg RSA -keysize 2048 -validity 10000 \
               -alias mudlife -storepass 123456 -keypass 123456 \
               -dname "CN=MudLife, OU=MudLife, O=MudLife, L=Zhenjiang, S=Jiangsu, C=CN"
           fi
-          echo "KEYSTORE_FILE=../release.jks" >> local.properties
+          echo "KEYSTORE_FILE=../mudlife.jks" >> local.properties
           echo "KEYSTORE_PASSWORD=123456" >> local.properties
           echo "KEY_ALIAS=mudlife" >> local.properties
           echo "KEY_PASSWORD=123456" >> local.properties

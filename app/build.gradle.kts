@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.hualala.linyu"
+    namespace = "cn.mudlife.app"
     compileSdk = 36
 
     defaultConfig {
@@ -30,13 +30,13 @@ android {
             if (propFile.exists()) {
                 propFile.inputStream().use { props.load(it) }
             }
-            val ksPath = props.getProperty("KEYSTORE_FILE", "../hualala.jks")
+            val ksPath = props.getProperty("KEYSTORE_FILE", "../mudlife.jks")
             val ks = file(ksPath)
             if (ks.exists()) {
                 storeFile = ks
-                storePassword = props.getProperty("KEYSTORE_PASSWORD", "")
-                keyAlias = props.getProperty("KEY_ALIAS", "")
-                keyPassword = props.getProperty("KEY_PASSWORD", "")
+                storePassword = props.getProperty("KEYSTORE_PASSWORD", "123456")
+                keyAlias = props.getProperty("KEY_ALIAS", "mudlife")
+                keyPassword = props.getProperty("KEY_PASSWORD", "123456")
             }
             enableV1Signing = true
             enableV2Signing = true

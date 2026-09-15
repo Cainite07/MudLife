@@ -31,7 +31,7 @@
 -keep,allowobfuscation interface <1>
 -keep,allowobfuscation,allowshrinking class retrofit2.Response
 -keep,allowobfuscation,allowshrinking interface retrofit2.Call
--keep class com.hualala.linyu.api.** { *; }
+-keep class cn.mudlife.app.api.** { *; }
 -dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
 -dontwarn javax.annotation.**
 -dontwarn kotlin.Unit
@@ -43,16 +43,16 @@
 -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
 -keepattributes *Annotation*
 -dontwarn sun.misc.**
--keepclassmembers class com.hualala.linyu.model.** { <fields>; }
--keep class com.hualala.linyu.model.** { *; }
--keep class com.hualala.linyu.api.** { *; }
+-keepclassmembers class cn.mudlife.app.model.** { <fields>; }
+-keep class cn.mudlife.app.model.** { *; }
+-keep class cn.mudlife.app.api.** { *; }
 -keep class com.google.gson.** { *; }
 -keep class com.google.gson.reflect.TypeToken { *; }
 -keep class * extends com.google.gson.reflect.TypeToken
 -keepclasseswithmembers class * { @com.google.gson.annotations.SerializedName <fields>; }
 
 # ── Keep entire app package (Gson generics break under R8) ──
--keep class com.hualala.linyu.** { *; }
+-keep class cn.mudlife.app.** { *; }
 
 # ── Kotlin Metadata (required for suspend function return types) ──
 -keep class kotlin.Metadata { *; }
@@ -62,8 +62,8 @@
 
 # ── Force keep generic signatures for Gson type resolution ──
 -keepattributes Signature, Exceptions, *Annotation*
--keep class com.hualala.linyu.model.BaseResponse { *; }
--keep class com.hualala.linyu.model.BaseResponse$* { *; }
+-keep class cn.mudlife.app.model.BaseResponse { *; }
+-keep class cn.mudlife.app.model.BaseResponse$* { *; }
 
 # ── OkHttp / Okio ──
 -dontwarn okhttp3.**

@@ -3,10 +3,10 @@
   "versionName": "1.3.14",
   "releaseDate": "2026-09-15",
   "title": "v1.3.14 (Build 22)",
-  "changelog": "1. 全面优化“我的”页面卡片材质，增强与背景的对比度与层次质感；\n2. 引入极简素雅系统级矢量图标体系；\n3. 新增国内免翻墙多通道高速检查更新与版本升级支持；\n4. 新增低调查看源代码入口。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.3.14/mudlife-v1.3.14.apk",
+  "changelog": "视觉与交互升级：\n• “我的”页面材质强化：优化半透明磨砂卡片对比度与边缘微质感\n• 悬浮微光胶囊 Toast 与极简线框矢量图标\n功能完善与体验修复：\n• 吹风机抽选换码体系：优化轮换抽选逻辑\n• 应用更新：集成国内高速镜像通道，应用内一键下载升级\n• GitHub主页入口：关于页新增源代码与仓库直达链接\n底层重构与平滑升级：\n• 包名迁移至独立包名 cn.mudlife.app\n• 无感自动迁移历史登录凭据与配置",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.3.14/MudLife-v1.3.14.apk",
   "mirrors": [
-    "https://ghfast.top/https://github.com/Cainite07/MudLife/releases/download/v1.3.14/mudlife-v1.3.14.apk",
-    "https://ghproxy.net/https://github.com/Cainite07/MudLife/releases/download/v1.3.14/mudlife-v1.3.14.apk"
+    "https://ghfast.top/https://github.com/Cainite07/MudLife/releases/download/v1.3.14/MudLife-v1.3.14.apk",
+    "https://ghproxy.net/https://github.com/Cainite07/MudLife/releases/download/v1.3.14/MudLife-v1.3.14.apk"
   ]
 }
