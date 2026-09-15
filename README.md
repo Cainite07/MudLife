@@ -75,7 +75,7 @@
 ## 构建与下载
 
 ### 直接安装
-从右侧 [Releases](https://github.com/Cainite07/MudLife/releases) 下载最新签名的 `MudLife-v1.3.14.apk`。
+从右侧 [Releases](https://github.com/Cainite07/MudLife/releases) 下载最新签名的 `MudLife-v1.3.15.apk`。
 
 ### 本地编译
 需要 JDK 17+ 及 Android SDK 35/36：

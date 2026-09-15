@@ -164,6 +164,10 @@ class MainViewModel : ViewModel() {
             if (toRemove.isNotEmpty()) {
                 activeOrders.removeAll { toRemove.contains(it.snCode) }
                 activeDeviceSnCodes.removeAll(toRemove.toSet())
+                toRemove.forEach { sn ->
+                    PrefsHelper.setStartedAt(sn, 0L)
+                    PrefsHelper.clearAutoDiscon(sn)
+                }
                 saveOrders()
             }
         }
@@ -426,10 +430,10 @@ class MainViewModel : ViewModel() {
                     return@launch
                 }
 
-                // 记录开阀时间戳（供消费金额过滤）
-                if (PrefsHelper.getStartedAt(snCode) <= 0L) {
-                    PrefsHelper.setStartedAt(snCode, System.currentTimeMillis())
-                }
+                // 记录开阀时间戳（无条件重置为当前开阀时间，秒数清零）
+                val now = System.currentTimeMillis()
+                PrefsHelper.setStartedAt(snCode, now)
+                showerElapsedSec = 0
 
                 val wType = if (snCode.contains(",G,") || device.displayName.contains("冷")) "冷水"
                             else if (snCode.contains(",M,") || device.displayName.contains("热")) "热水"
@@ -493,9 +497,14 @@ class MainViewModel : ViewModel() {
             PrefsHelper.setAutoDisconRemain(snCode, autoDiscon)
         }
 
+        val now = System.currentTimeMillis()
         val st = PrefsHelper.getStartedAt(snCode)
-        showerElapsedSec = if (st > 0) ((System.currentTimeMillis() - st) / 1000).toInt() else {
-            PrefsHelper.setStartedAt(snCode, System.currentTimeMillis()); 0
+        val isValidSt = st > 0L && st <= now && (now - st) < 4 * 3600 * 1000L
+        if (orderNo == null || !isValidSt) {
+            PrefsHelper.setStartedAt(snCode, now)
+            showerElapsedSec = 0
+        } else {
+            showerElapsedSec = ((now - st) / 1000).toInt()
         }
 
         lastDeviceName = device.displayName; lastDeviceMac = device.macAddress; lastDeviceSnCode = snCode; lastDeviceEmoji = device.typeEmoji
@@ -517,8 +526,11 @@ class MainViewModel : ViewModel() {
             var tick = 0
             while (isShowering) {
                 delay(500); tick++
-                val st = PrefsHelper.getStartedAt(snCode)
-                if (st > 0) showerElapsedSec = ((System.currentTimeMillis() - st) / 1000).toInt()
+                val curSt = PrefsHelper.getStartedAt(snCode)
+                if (curSt > 0) {
+                    val diff = (System.currentTimeMillis() - curSt) / 1000
+                    showerElapsedSec = if (diff >= 0) diff.toInt() else 0
+                }
 
                 // 自动关停倒计时递减（每秒递减，500ms * 2 = 1s）
                 if (tick % 2 == 0) {
@@ -574,10 +586,14 @@ class MainViewModel : ViewModel() {
         autoCloseLoading = false
         showAutoCloseDialog = true
 
+        val startTime = PrefsHelper.getStartedAt(snCode)
+        // 立即清除持久化的开阀时间戳与倒计时，防止用户不点弹窗确认直接退出时残留脏时间戳
+        PrefsHelper.setStartedAt(snCode, 0L)
+        PrefsHelper.clearAutoDiscon(snCode)
+
         // 后台异步静默等账单结算，若拿到金额则更新弹窗显示，不阻塞用户点击确认退出
         viewModelScope.launch {
             val orderNo = currentOrderNo ?: activeOrders.find { it.snCode == snCode }?.orderNo ?: ""
-            val startTime = PrefsHelper.getStartedAt(snCode)
             try {
                 val amount = queryLastBillAmount(orderNo, startTime) ?: 0.0
                 if (amount > 0.0) {
