@@ -17,6 +17,8 @@
 
 MudLife 面向江苏大学的校园日常，把校园卡付款、生活账单、饮水机和两组使用码放进同一个应用。温暖纸黄与墨绿配色，搭配轻触反馈，让常用操作更顺手。
 
+<p align="center"><a href="assets/promo/mudlife-social.png">下载完整宣传长图 · 分享给同学</a></p>
+
 ## 四个页面，各有安排
 
 <table>
