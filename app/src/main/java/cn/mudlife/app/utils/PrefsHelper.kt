@@ -145,7 +145,7 @@ object PrefsHelper {
             "loginCode", "userId", "accountId", "projectId",
             "telephone", "userName", "studentNo", "schoolName",
             "lastDeviceName", "lastDeviceMac", "lastDeviceSnCode", "lastDeviceEmoji",
-            "boundRoom", "recentDevices", "activeOrders", "themeMode", "projectAccounts",
+            "boundRoom", "recentDevices", "activeOrders", "projectAccounts",
             // 后勤专区凭证
             "qzhqLoginCode", "qzhqPhone", "qzhqProjectId",
             "qzhqRandomCode", "qzhqCustomCode", "qzhqStatus",

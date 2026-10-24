@@ -19,7 +19,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 data class UpdateInfo(
@@ -67,8 +66,12 @@ object UpdateManager {
 
     internal fun downloadUrls(info: UpdateInfo): List<String> {
         val official = info.downloadUrl.toHttpUrlOrNull()?.takeIf { it.isHttps && it.host == "github.com" && it.encodedPath.contains("/releases/download/") }
-        val directMirror = official?.let { "https://ghproxy.net/$it" }
-        return (info.mirrors + listOfNotNull(directMirror) + listOfNotNull(official?.let { "https://ghfast.top/$it" }) + info.downloadUrl)
+        val domestic = official?.takeIf { it.encodedPath.startsWith("/Cainite07/MudLife/releases/download/") }
+            ?.let { "https://gitee.com/cainite/MudLife/releases/download/" + it.encodedPath.substringAfter("/releases/download/") }
+        fun proxy(url: String) = url.toHttpUrlOrNull()?.host in setOf("ghproxy.net", "ghfast.top")
+        return (listOfNotNull(domestic) + info.mirrors.filterNot(::proxy) + listOfNotNull(official?.toString()) +
+            info.mirrors.filter(::proxy) + listOfNotNull(official?.let { "https://ghproxy.net/$it" },
+                official?.let { "https://ghfast.top/$it" }) + info.downloadUrl)
             .filter { it.toHttpUrlOrNull()?.isHttps == true }.distinct()
     }
 
@@ -97,71 +100,25 @@ object UpdateManager {
     suspend fun downloadApk(
         context: Context,
         info: UpdateInfo,
-        onProgress: (Float) -> Unit
+        onProgress: (UpdateDownloadProgress) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         if (cn.mudlife.app.BuildConfig.DEBUG) {
             return@withContext Result.failure(IllegalStateException("修复预览版不下载正式版更新"))
         }
-        val candidateUrls = downloadUrls(info)
-
-        val dlClient = OkHttpClient.Builder()
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(5, TimeUnit.MINUTES)
-            .build()
-
         val destFile = File(context.cacheDir, "mudlife_update_${info.versionCode}.apk")
         if (destFile.isFile && runCatching { validateUpdate(context, destFile, info.versionCode) }.isSuccess) {
             return@withContext Result.success(destFile)
         }
-        var lastErr: Exception? = null
-
-        for (url in candidateUrls) {
-            try {
-                withContext(Dispatchers.Main) { onProgress(0f) }
-                val req = Request.Builder()
-                    .url(url)
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
-                    .build()
-                dlClient.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) return@use
-                    val body = resp.body ?: return@use
-                    val total = body.contentLength()
-                    var downloaded = 0L
-                    var reported = 0f
-
-                    body.byteStream().use { input ->
-                        FileOutputStream(destFile).use { output ->
-                            val buffer = ByteArray(32 * 1024)
-                            var read: Int
-                            while (input.read(buffer).also { read = it } != -1) {
-                                output.write(buffer, 0, read)
-                                downloaded += read
-                                if (total > 0) {
-                                    val progress = downloaded.toFloat() / total
-                                    if (progress - reported >= .01f || downloaded == total) {
-                                        reported = progress
-                                        withContext(Dispatchers.Main) { onProgress(progress.coerceIn(0f, 1f)) }
-                                    }
-                                }
-                            }
-                            output.flush()
-                        }
-                    }
-                    if (destFile.exists() && destFile.length() > 1024 * 1024) {
-                        validateUpdate(context, destFile, info.versionCode)
-                        return@withContext Result.success(destFile)
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                destFile.delete()
-                throw cancelled
-            } catch (e: Exception) {
-                lastErr = e
-            }
-        }
         destFile.delete()
-        Result.failure(lastErr ?: Exception("安装包下载失败，请稍后重试"))
+        try {
+            val downloader = UpdateDownloader(OkHttpClient.Builder().connectTimeout(6, TimeUnit.SECONDS)
+                .readTimeout(12, TimeUnit.SECONDS).callTimeout(5, TimeUnit.MINUTES).build())
+            downloader.download(downloadUrls(info), destFile,
+                onProgress = { state -> withContext(Dispatchers.Main) { onProgress(state) } },
+                validate = { validateUpdate(context, it, info.versionCode) })
+            Result.success(destFile)
+        } catch (cancelled: CancellationException) { throw cancelled }
+          catch (e: Exception) { Result.failure(e) }
     }
 
     fun installApk(context: Context, file: File): Result<Unit> = runCatching {

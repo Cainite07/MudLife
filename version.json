@@ -1,11 +1,11 @@
 {
-  "versionCode": 34,
-  "versionName": "1.4.5",
-  "releaseDate": "2026-10-24",
-  "title": "MudLife v1.4.5",
-  "changelog": "校园日常，放在一起。\n\n· 融合学校一卡通、趣智校园与趣智热水后勤，首次安装可按需登录。\n· 校园卡余额移至账单顶部，按饮食、洗澡、充值等分类，只统计学校校园卡支出。\n· 使用码同时展示洗浴码与吹风机码，优化页面、动画、触感和通知。\n· 换用「校园之门」图标，保留温暖纸黄色调。\n· 新增 Gitee 国内更新源，优先从 Gitee 下载；安装前验证版本与固定签名。\n· 完善项目主页和脱敏宣传图，GitHub/Gitee 同步发行。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.4.5/MudLife-1.4.5.apk",
+  "versionCode": 35,
+  "versionName": "1.4.6",
+  "releaseDate": "2026-10-25",
+  "title": "MudLife v1.4.6",
+  "changelog": "· 修复切页透明闪烁与矩形扩散反馈，统一不透明页面背景。\n· 外观提供跟随系统、浅色和深色，保存选择；深浅切换采用整幅画面同步的圆形展开与收回。\n· 移除全部页面的截屏、录屏限制。\n· 校园卡充值选项及按钮改为纸色和鼠尾草绿，补全深浅主题配色。\n· Gitee 与 GitHub 并行选源，复用先收到有效数据的连接，失败回退备用源。\n· 下载显示实际传输量、速度和来源，分别提示连接、下载和验证阶段。\n· 沿用固定签名，保留既有账号与保存的数据。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.4.6/MudLife-1.4.6.apk",
   "mirrors": [
-    "https://gitee.com/cainite/MudLife/releases/download/v1.4.5/MudLife-1.4.5.apk"
+    "https://gitee.com/cainite/MudLife/releases/download/v1.4.6/MudLife-1.4.6.apk"
   ]
 }

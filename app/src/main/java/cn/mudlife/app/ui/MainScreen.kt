@@ -99,7 +99,7 @@ fun MainScreen(phone: String, viewModel: MainViewModel = viewModel(), onUseCodes
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
-            containerColor = Color.Transparent
+            containerColor = AppColors.Background
         ) { padding ->
             if (viewModel.isShowering) {
                 ShowerScreen(

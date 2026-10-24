@@ -12,7 +12,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
-import android.view.WindowManager
 import android.webkit.*
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -62,7 +61,6 @@ class SchoolActivity : ComponentActivity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         session = SessionStore(this)
         electric = intent.getStringExtra("mode") == "electric"
         payment = electric || intent.getStringExtra("mode") == "payment"

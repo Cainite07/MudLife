@@ -24,7 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +53,7 @@ fun UserScreen(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val themeReveal = LocalThemeReveal.current
+    val view = LocalView.current
     val isDark = AppColors.isDark
 
     var buttonCenter by remember { mutableStateOf(Offset.Zero) }
@@ -105,7 +107,9 @@ fun UserScreen(
                 modifier = Modifier
                     .size(44.dp)
                     .onGloballyPositioned { coords ->
-                        buttonCenter = coords.boundsInRoot().center
+                        val screen = IntArray(2).also(view::getLocationOnScreen)
+                        val window = IntArray(2).also(view::getLocationInWindow)
+                        buttonCenter = coords.boundsInWindow().center + Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat())
                     }
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -778,7 +782,8 @@ internal fun AppUpdateDialog(viewModel: MainViewModel) {
     if (viewModel.showUpdateDialog == true) {
         val info = viewModel.updateInfo
         val isDownloading = viewModel.isDownloadingUpdate
-        val progress = viewModel.downloadProgress
+        val download = viewModel.updateDownload
+        val progress = download.fraction
 
         AlertDialog(
             onDismissRequest = { viewModel.closeUpdateDialog() },
@@ -821,22 +826,17 @@ internal fun AppUpdateDialog(viewModel: MainViewModel) {
                     }
                     if (isDownloading) {
                         Spacer(Modifier.height(14.dp))
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = AppColors.Accent,
-                            trackColor = AppColors.Border
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = "正在下载 ${(progress * 100).toInt()}%",
-                            fontSize = 13.sp,
-                            color = AppColors.TextSecondary,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        )
+                        val track = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+                        if (progress != null && download.phase == cn.mudlife.app.utils.UpdateDownloadPhase.DOWNLOADING)
+                            LinearProgressIndicator(progress = { progress }, modifier = track,
+                                color = AppColors.Accent, trackColor = AppColors.Border)
+                        else LinearProgressIndicator(modifier = track, color = AppColors.Accent, trackColor = AppColors.Border)
+                        Spacer(Modifier.height(8.dp))
+                        if (progress != null && download.phase == cn.mudlife.app.utils.UpdateDownloadPhase.DOWNLOADING)
+                            Text("${(progress * 100).toInt()}%", fontSize = 13.sp, color = AppColors.TextSecondary,
+                                modifier = Modifier.align(Alignment.CenterHorizontally))
+                        Text(download.description, fontSize = 12.sp, color = AppColors.TextSecondary,
+                            modifier = Modifier.align(Alignment.CenterHorizontally))
                     }
                 }
             },

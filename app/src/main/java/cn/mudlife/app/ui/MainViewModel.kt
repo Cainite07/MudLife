@@ -128,7 +128,8 @@ class MainViewModel(
     var updateInfo by mutableStateOf<cn.mudlife.app.utils.UpdateInfo?>(null)
     var showUpdateDialog by mutableStateOf(false)
     var isDownloadingUpdate by mutableStateOf(false)
-    var downloadProgress by mutableStateOf(0f)
+    var updateDownload by mutableStateOf(cn.mudlife.app.utils.UpdateDownloadProgress())
+        private set
     var updateError by mutableStateOf<String?>(null); private set
 
     // ── 后勤热水使用码 (江大专区) ──
@@ -1120,11 +1121,11 @@ class MainViewModel(
         if (isDownloadingUpdate) return
         viewModelScope.launch {
             isDownloadingUpdate = true
-            downloadProgress = 0f
+            updateDownload = cn.mudlife.app.utils.UpdateDownloadProgress()
             updateError = null
             try {
                 val result = cn.mudlife.app.utils.UpdateManager.downloadApk(context, info) { progress ->
-                    downloadProgress = progress
+                    updateDownload = progress
                 }
                 if (result.isSuccess) {
                     val file = result.getOrNull()
@@ -1137,7 +1138,7 @@ class MainViewModel(
                         updateError = "安装包解析异常"
                     }
                 } else {
-                    updateError = "安装包下载失败，请稍后重试"
+                    updateError = result.exceptionOrNull()?.message ?: "安装包下载失败，请稍后重试"
                 }
             } catch (_: Exception) {
                 updateError = "下载更新异常，请稍后重试"

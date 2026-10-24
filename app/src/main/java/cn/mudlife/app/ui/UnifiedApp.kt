@@ -8,10 +8,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,8 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.semantics.Role
@@ -41,6 +43,7 @@ import cn.mudlife.app.utils.PrefsHelper
 import cn.mudlife.app.utils.HapticHelper
 import cn.mudlife.app.utils.UpdateManager
 import cn.mudlife.campuscard.*
+import kotlinx.coroutines.flow.collect
 
 @Composable
 fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
@@ -59,9 +62,6 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     var featureBack by rememberSaveable { mutableIntStateOf(2) }
     val loginLife = { loginBack = page; page = "login" }
     val pageState = rememberSaveableStateHolder()
-    val entrance = remember { Animatable(1f) }
-    val shift = with(LocalDensity.current) { 8.dp.toPx() }
-    LaunchedEffect(tab, page) { entrance.snapTo(0f); entrance.animateTo(1f, tween(180)) }
     var pending by remember { mutableStateOf(false) }
     var logout by remember { mutableStateOf("") }
     var account by remember { mutableStateOf("") }
@@ -103,10 +103,6 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
         }
     }
     LaunchedEffect(page, campus.config?.feeItem) { if (page == "recharge") campus.loadRechargeRules() }
-    DisposableEffect(codeVisible, tab, page) {
-        if (codeVisible || tab == 3 || page in setOf("codes", "bath", "dryer", "electric")) activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
-    }
     DisposableEffect(codeVisible, foreground, campus.brightCode) {
         val enabled = codeVisible && foreground && campus.brightCode
         val previous = activity.window.attributes.screenBrightness
@@ -134,10 +130,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     Scaffold(containerColor = AppColors.Background, snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
         if (page.isEmpty() && !life.isShowering) UnifiedNavigation(tab) { tab = it }
     }) { insets ->
-        Box(Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets).graphicsLayer {
-            alpha = .85f + .15f * entrance.value
-            translationY = shift * (1f - entrance.value)
-        }) {
+        Box(Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets).background(AppColors.Background)) {
             pageState.SaveableStateProvider(page.ifEmpty { "tab:$tab" }) {
             when {
                 page == "login" -> LoginScreen(onCampusCard = loginSchool, onBack = back, onLoginSuccess = {
@@ -255,13 +248,15 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
         Row(Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 4.dp)) {
             listOf("首页" to Icons.Outlined.Home, "校园卡" to Icons.Outlined.QrCodeScanner,
                 "账单" to Icons.Outlined.ReceiptLong, "我的" to Icons.Outlined.PersonOutline).forEachIndexed { index, (name, icon) ->
-                val color by animateColorAsState(if (index == tab) AppColors.Accent else AppColors.TextSecondary, tween(160), label = "navigationInk")
-                val indicator by animateColorAsState(if (index == tab) AppColors.ActiveBg else androidx.compose.ui.graphics.Color.Transparent, tween(160), label = "navigationPill")
-                Column(Modifier.weight(1f).selectable(selected = index == tab, role = Role.Tab, onClick = { if (index != tab) { HapticHelper.tick(context); select(index) } }).padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(width = 54.dp, height = 30.dp).background(indicator, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
-                        Icon(icon, name, Modifier.size(22.dp), tint = color)
+                key(AppColors.isDark) {
+                    val color by animateColorAsState(if (index == tab) AppColors.Accent else AppColors.TextSecondary, tween(160), label = "navigationInk")
+                    val indicator by animateColorAsState(if (index == tab) AppColors.ActiveBg else androidx.compose.ui.graphics.Color.Transparent, tween(160), label = "navigationPill")
+                    Column(Modifier.weight(1f).selectable(selected = index == tab, role = Role.Tab, onClick = { if (index != tab) { HapticHelper.tick(context); select(index) } }).padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.size(width = 54.dp, height = 30.dp).background(indicator, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
+                            Icon(icon, name, Modifier.size(22.dp), tint = color)
+                        }
+                        Text(name, fontSize = 11.sp, color = color, modifier = Modifier.padding(top = 4.dp))
                     }
-                    Text(name, fontSize = 11.sp, color = color, modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
@@ -304,6 +299,12 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     val theme = LocalThemeReveal.current
     val context = LocalContext.current
     var feedback by remember { mutableStateOf(PrefsHelper.touchFeedback) }
+    var appearance by remember { mutableStateOf(false) }
+    val mode = LocalThemeMode.current.value
+    if (appearance) AppearancePicker(mode, { appearance = false }) { next, point ->
+        appearance = false
+        theme.select(next, point)
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(bottom = 22.dp)) {
         PageTitle("我的", padded = false)
         val identity = vm.identity
@@ -323,7 +324,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
         }
         SectionLabel("偏好设置")
         SettingsGroup {
-            SettingsRow("外观", Icons.Outlined.Palette, if (AppColors.isDark) "深色" else "浅色") { theme.toggle(Offset.Zero) }
+            SettingsRow("外观", Icons.Outlined.Palette, mode.label) { if (!theme.transitioning) appearance = true }
             Row(Modifier.fillMaxWidth().heightIn(min = 55.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Vibration, null, Modifier.size(21.dp), tint = AppColors.TextPrimary)
                 Text("触感反馈", Modifier.weight(1f).padding(start = 14.dp), fontSize = 15.sp)
@@ -336,6 +337,44 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             SettingsRow("GitHub", Icons.Outlined.Code) { UpdateManager.openBrowser(context, "https://github.com/Cainite07/MudLife") }
             SettingsRow("Gitee", Icons.Outlined.Download) { UpdateManager.openBrowser(context, "https://gitee.com/cainite/MudLife") }
         }
+    }
+}
+
+@Composable private fun AppearancePicker(mode: ThemeMode, dismiss: () -> Unit, select: (ThemeMode, Offset) -> Unit) {
+    AlertDialog(onDismissRequest = dismiss, title = { Text("外观") }, text = {
+        Column {
+            ThemeMode.entries.forEach { option ->
+                AppearanceOption(option, mode == option) { point ->
+                    if (mode == option) dismiss() else select(option, point)
+                }
+            }
+        }
+    }, confirmButton = { TextButton(onClick = dismiss) { Text("关闭") } })
+}
+
+@Composable private fun AppearanceOption(mode: ThemeMode, selected: Boolean, select: (Offset) -> Unit) {
+    val context = LocalContext.current
+    val view = LocalView.current
+    val interactions = remember { MutableInteractionSource() }
+    var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var press by remember { mutableStateOf<Offset?>(null) }
+    LaunchedEffect(interactions) {
+        interactions.interactions.collect { if (it is PressInteraction.Press) press = it.pressPosition }
+    }
+    Row(Modifier.fillMaxWidth().onGloballyPositioned { coordinates = it }
+        .selectable(selected = selected, interactionSource = interactions, indication = LocalIndication.current,
+            role = Role.RadioButton, onClick = {
+                val layout = coordinates
+                val screen = IntArray(2).also(view::getLocationOnScreen)
+                val window = IntArray(2).also(view::getLocationInWindow)
+                val point = layout?.localToWindow(press ?: Offset(layout.size.width / 2f, layout.size.height / 2f))
+                val origin = point?.plus(Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat()))
+                    ?: Offset.Unspecified
+                HapticHelper.tick(context)
+                select(origin)
+            }).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        RadioButton(selected, onClick = null)
+        Text(mode.label, Modifier.padding(start = 14.dp))
     }
 }
 

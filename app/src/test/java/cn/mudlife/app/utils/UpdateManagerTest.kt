@@ -20,9 +20,10 @@ class UpdateManagerTest {
     @Test fun githubDownloadsHaveDirectFallbacksEvenWithoutManifestMirrors() {
         val url = "https://github.com/Cainite07/MudLife/releases/download/v1.4.5/MudLife-1.4.5.apk"
         val urls = UpdateManager.downloadUrls(UpdateInfo(versionCode = 34, downloadUrl = url, mirrors = listOf("https://ghproxy.net/$url")))
-        assertEquals("https://ghproxy.net/$url", urls.first())
-        assertEquals(3, urls.size)
-        assertEquals(url, urls.last())
+        assertEquals("https://gitee.com/cainite/MudLife/releases/download/v1.4.5/MudLife-1.4.5.apk", urls.first())
+        assertEquals(url, urls[1])
+        assertEquals(4, urls.size)
+        assertEquals("https://ghproxy.net/$url", urls[2])
     }
 
     @Test fun mirrorOnlyManifestAndDirectHostsRemainUsable() {
@@ -36,7 +37,7 @@ class UpdateManagerTest {
         val github = "https://github.com/Cainite07/MudLife/releases/download/v1.4.5/MudLife-1.4.5.apk"
         val urls = UpdateManager.downloadUrls(UpdateInfo(versionCode = 34, downloadUrl = github, mirrors = listOf(direct)))
         assertEquals(direct, urls.first())
-        assertEquals(github, urls.last())
+        assertEquals(github, urls[1])
         assertEquals("https://gitee.com/cainite/MudLife/raw/main/version.json", UpdateManager.CHECK_URLS.first())
     }
 }

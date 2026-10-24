@@ -10,9 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cn.mudlife.app.ui.theme.MudLifeThemeSpecific
 import cn.mudlife.app.ui.theme.ThemeMode
+import cn.mudlife.app.utils.PrefsHelper
 
 @Composable fun CampusTheme(content: @Composable () -> Unit) =
-    MudLifeThemeSpecific(if (isSystemInDarkTheme()) ThemeMode.DARK else ThemeMode.LIGHT, content)
+    MudLifeThemeSpecific(ThemeMode.restore(PrefsHelper.themeMode).resolve(isSystemInDarkTheme()), content)
 
 @Composable internal fun Paper(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface,

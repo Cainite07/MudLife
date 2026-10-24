@@ -3,7 +3,8 @@ package cn.mudlife.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.graphics.drawable.ColorDrawable
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.*
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -32,16 +33,17 @@ class MainActivity : ComponentActivity() {
                 NetworkModule.restoreFromPrefs()
             }
             setContent {
-                val systemDark = isSystemInDarkTheme()
-                val mode = remember { mutableStateOf(if (systemDark) ThemeMode.DARK else ThemeMode.LIGHT) }
-                LaunchedEffect(systemDark) { mode.value = if (systemDark) ThemeMode.DARK else ThemeMode.LIGHT }
+                val mode = remember { mutableStateOf(ThemeMode.restore(PrefsHelper.themeMode)) }
                 val life: MainViewModel = viewModel()
                 val campus: CampusViewModel = viewModel()
-                CircularRevealThemeHost(mode, onThemeChanged = {}) {
+                CircularRevealThemeHost(mode, onThemeChanged = { PrefsHelper.themeMode = it.name }) {
+                    val windowDark = LocalThemeWindowDark.current
+                    val background = AppColors.Background
                     SideEffect {
+                        window.setBackgroundDrawable(ColorDrawable(background.toArgb()))
                         WindowCompat.getInsetsController(window, window.decorView).apply {
-                            isAppearanceLightStatusBars = mode.value == ThemeMode.LIGHT
-                            isAppearanceLightNavigationBars = mode.value == ThemeMode.LIGHT
+                            isAppearanceLightStatusBars = !windowDark
+                            isAppearanceLightNavigationBars = !windowDark
                         }
                     }
                     UnifiedApp(life, campus)

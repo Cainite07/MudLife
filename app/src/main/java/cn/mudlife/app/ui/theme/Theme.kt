@@ -1,6 +1,8 @@
 package cn.mudlife.app.ui.theme
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
@@ -9,7 +11,11 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
 
-enum class ThemeMode { LIGHT, DARK }
+enum class ThemeMode(val label: String) {
+    SYSTEM("跟随系统"), LIGHT("浅色"), DARK("深色");
+    fun resolve(systemDark: Boolean): ThemeMode = if (this == SYSTEM) { if (systemDark) DARK else LIGHT } else this
+    companion object { fun restore(saved: String): ThemeMode = entries.firstOrNull { it.name == saved } ?: SYSTEM }
+}
 
 // Paper, warm ink and muted olive. Geometry belongs to the existing screens.
 val LightColors = AppColorSet(
@@ -54,7 +60,7 @@ data class AppColorSet(
 )
 
 val LocalAppColors = staticCompositionLocalOf { LightColors }
-val LocalThemeMode = compositionLocalOf { mutableStateOf(ThemeMode.DARK) }
+val LocalThemeMode = compositionLocalOf { mutableStateOf(ThemeMode.SYSTEM) }
 
 /** Convenience: use AppColors.xxx in composable functions */
 object AppColors {
@@ -78,10 +84,14 @@ object AppColors {
 
 @Composable
 fun MudLifeThemeSpecific(mode: ThemeMode, content: @Composable () -> Unit) {
-    val dark = (mode == ThemeMode.DARK)
+    val dark = mode == ThemeMode.DARK || (mode == ThemeMode.SYSTEM && isSystemInDarkTheme())
     val set = if (dark) DarkColors else LightColors
     val scheme = if (dark) darkColorScheme(
         primary = set.Accent,
+        primaryContainer = set.ActiveBg,
+        onPrimaryContainer = set.Accent,
+        secondaryContainer = set.ActiveBg,
+        onSecondaryContainer = set.Accent,
         background = set.Background,
         surface = set.SolidSurface,
         surfaceContainer = set.SolidSurface,
@@ -98,6 +108,10 @@ fun MudLifeThemeSpecific(mode: ThemeMode, content: @Composable () -> Unit) {
         surfaceVariant = set.SurfaceVariant
     ) else lightColorScheme(
         primary = set.Accent,
+        primaryContainer = set.ActiveBg,
+        onPrimaryContainer = set.Accent,
+        secondaryContainer = set.ActiveBg,
+        onSecondaryContainer = set.Accent,
         background = set.Background,
         surface = set.SolidSurface,
         surfaceContainer = set.SolidSurface,
@@ -123,7 +137,9 @@ fun MudLifeThemeSpecific(mode: ThemeMode, content: @Composable () -> Unit) {
             headlineMedium = base.headlineMedium.copy(fontFamily = FontFamily.Serif),
             headlineSmall = base.headlineSmall.copy(fontFamily = FontFamily.Serif),
             titleLarge = base.titleLarge.copy(fontFamily = FontFamily.Serif)
-        ), content = content)
+        )) {
+            CompositionLocalProvider(LocalIndication provides rememberPaperPressIndication(set.Accent), content = content)
+        }
     }
 }
 

@@ -4,7 +4,7 @@
 
 <h1 align="center">泥浆生活 · MudLife</h1>
 <p align="center"><b>校园日常，放在一起。</b><br>江苏大学一卡通 · 趣智校园 · 趣智热水后勤</p>
-<p align="center">v1.4.5 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
+<p align="center">v1.4.6 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
 
 <p align="center">
   <a href="https://gitee.com/cainite/MudLife/releases"><b>Gitee 国内下载</b></a> &emsp;
@@ -52,7 +52,7 @@ MudLife 面向江苏大学的校园日常，把校园卡付款、生活账单、
 - **趣智校园** — 饮水机与吹风机使用码。
 - **趣智热水后勤** — 洗浴使用码。
 
-首次安装有可跳过的引导，也可以在“我的 → 账号管理”随时补充。三个账号独立保存，未登录的服务提供对应入口。
+首次安装有可跳过的引导，也可以在“我的 → 账号管理”随时补充。三个账号独立保存，未登录的服务提供对应入口。“我的 → 外观”可选跟随系统、浅色或深色。
 
 学校服务依赖校方系统与网络；需要微信的支付流程会进入相应环境，返回后核对原订单结果。在线付款码不替代 NFC 校园卡。
 
@@ -68,7 +68,7 @@ MudLife 面向江苏大学的校园日常，把校园卡付款、生活账单、
 
 ## 下载与覆盖升级
 
-国内网络优先使用 [Gitee 发行版](https://gitee.com/cainite/MudLife/releases)，也可从 [GitHub Releases](https://github.com/Cainite07/MudLife/releases) 下载。两端提供相同 APK 与 SHA-256 校验文件；应用内更新优先采用 Gitee，保留备用源。
+国内网络优先使用 [Gitee 发行版](https://gitee.com/cainite/MudLife/releases)，也可从 [GitHub Releases](https://github.com/Cainite07/MudLife/releases) 下载。两端提供相同 APK 与 SHA-256 校验文件；应用内更新并行连接 Gitee 与 GitHub，使用先收到有效数据的源，并保留备用源。
 
 正式版包名为 `cn.mudlife.app`，沿用固定签名，正常覆盖升级保留本机登录和保存的数据。**1.3.18 之前的旧签名版本不能直接覆盖升级**；切换前请保存所需信息，卸载旧包会清除其数据。
 
