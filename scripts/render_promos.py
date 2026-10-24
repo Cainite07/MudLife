@@ -1,9 +1,13 @@
-"""Render editable, privacy-safe base illustrations. Final AI artwork is in assets/promo/."""
+"""Render all three privacy-safe posters from one shared, fixed-size layout system."""
+import argparse
+from functools import lru_cache
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "app" / "build" / "outputs" / "promo-drafts"
+POSTER_SIZE = (1600, 1000)
+PHONE_WIDTH, PHONE_HEIGHT, FRAME_PAD, PHONE_TOP = 330, 715, 12, 180
 PAPER, CARD, INK, GREEN, MUTED, LINE = "#F6F3EB", "#FFFDF8", "#292F2B", "#344E43", "#777B71", "#E4E3D8"
 FONT = Path("C:/Windows/Fonts/msyh.ttc")
 BOLD = Path("C:/Windows/Fonts/msyhbd.ttc")
@@ -83,6 +87,7 @@ def navigation(draw, selected):
         text(draw,(x,731),label,11,GREEN if n==selected else MUTED,anchor="mt")
 
 
+@lru_cache(maxsize=5)
 def screen(kind):
     image=Image.new("RGB",(1080,2340),PAPER)
     d=ScaledDraw(ImageDraw.Draw(image),3)
@@ -92,18 +97,18 @@ def screen(kind):
     if kind=="codes":text(d,(22,57),"‹",27);text(d,(49,57),title,25)
     else:text(d,(22,57),title,25,bold=False)
     if kind=="bills":
-        box(d,(22,112,338,230));text(d,(42,132),"校园卡余额",12,MUTED)
-        text(d,(42,155),"¥ 86.50",30,bold=True);box(d,(260,154,318,190),"#E8ECE3",10);text(d,(275,163),"充值",13,GREEN)
-        text(d,(23,262),"2026年 10月",14);d.line([(125,270),(130,275),(135,270)],fill=MUTED)
-        text(d,(336,250),"本月支出",11,MUTED,anchor="rt")
-        text(d,(336,268),"¥ 128.60",23,bold=True,anchor="rt")
+        box(d,(22,112,338,212));text(d,(42,128),"校园卡余额",12,MUTED)
+        text(d,(42,151),"¥ 86.50",30,bold=True);box(d,(260,150,318,186),"#E8ECE3",10);text(d,(275,159),"充值",13,GREEN)
+        text(d,(23,244),"2026年 10月",14);d.line([(125,252),(130,257),(135,252)],fill=MUTED)
+        text(d,(336,232),"本月支出",11,MUTED,anchor="rt")
+        text(d,(336,250),"¥ 128.60",22,bold=True,anchor="rt")
         x=22
         for n,label in enumerate(["全部","饮食","洗澡","充值","其他"]):
-            box(d,(x,312,x+56,342),"#E8ECE3" if n==0 else PAPER,10,LINE)
-            text(d,(x+28,319),label,12,GREEN if n==0 else MUTED,anchor="mt");x+=65
-        text(d,(25,365),"2026-10-24",12,MUTED)
+            box(d,(x,294,x+56,324),"#E8ECE3" if n==0 else PAPER,10,LINE)
+            text(d,(x+28,301),label,12,GREEN if n==0 else MUTED,anchor="mt");x+=65
+        text(d,(25,347),"2026-10-24",12,MUTED)
         for i,(title,kind,amount,hour) in enumerate([("第二食堂","food","−12.50","12:10"),("洗浴消费","bath","−2.40","08:20"),("支付宝充值","card","+100.00","08:00")]):
-            y=396+i*73;box(d,(22,y+6,60,y+44),CARD,12);icon(d,kind,31,y+15,20)
+            y=378+i*70;box(d,(22,y+6,60,y+44),CARD,12);icon(d,kind,31,y+15,20)
             text(d,(74,y+6),title,14,bold=True);text(d,(74,y+30),f"{['饮食','洗澡','充值'][i]} · {hour}",11,MUTED)
             text(d,(337,y+16),amount,15,MUTED if i==2 else INK,anchor="rt")
             d.line((73,y+66,338,y+66),fill=LINE)
@@ -114,7 +119,6 @@ def screen(kind):
         for x,y,flipx,flipy in [(76,174,1,1),(284,174,-1,1),(76,382,1,-1),(284,382,-1,-1)]:
             d.line([(x,y+22*flipy),(x,y),(x+22*flipx,y)],fill=LINE,width=4)
         icon(d,"card",157,224,46,MUTED);text(d,(180,293),"付款码已隐藏",17,MUTED,anchor="mt")
-        text(d,(180,323),"宣传图不含可用付款信息",11,MUTED,anchor="mt")
         text(d,(180,427),"在线付款码",12,MUTED,anchor="mt")
         text(d,(24,481),"启动时打开付款码",13);switch(d,293,477,False)
         d.line((24,522,336,522),fill=LINE)
@@ -122,49 +126,79 @@ def screen(kind):
         navigation(d,1)
     elif kind=="home":
         for i,(label,name,fill) in enumerate([("扫码出水","scan",GREEN),("使用码","key",CARD)]):
-            x=22+164*i;box(d,(x,117,x+152,179),fill,16)
-            icon(d,name,x+19,137,22,CARD if i==0 else GREEN);text(d,(x+52,138),label,14,CARD if i==0 else GREEN)
-        text(d,(22,213),"常用饮水机",16,bold=True);box(d,(22,250,338,421))
+            x=22+164*i;box(d,(x,117,x+152,171),fill,16)
+            icon(d,name,x+19,133,22,CARD if i==0 else GREEN);text(d,(x+52,134),label,14,CARD if i==0 else GREEN)
+        text(d,(22,205),"常用饮水机",16,bold=True);box(d,(22,242,338,397))
         for i,(label,mode) in enumerate([("演示设备 · 冷水","冷水"),("演示设备 · 热水","热水")]):
-            y=269+i*82;icon(d,"card",39,y+5,23)
+            y=259+i*74;icon(d,"card",39,y+5,23)
             text(d,(78,y),label,14,bold=True);text(d,(78,y+25),"已保存设备",11,MUTED)
             box(d,(276,y+6,322,y+38),"#E8ECE3",10);text(d,(299,y+13),"出水",12,GREEN,anchor="mt")
-            if i==0:d.line((40,y+65,320,y+65),fill=LINE)
+            if i==0:d.line((40,y+59,320,y+59),fill=LINE)
         navigation(d,0)
     elif kind=="codes":
         for i,(label,name) in enumerate([("洗浴使用码","bath"),("吹风机使用码","key")]):
-            y=116+i*226;box(d,(22,y,338,y+198),CARD,18,LINE)
+            y=116+i*188;box(d,(22,y,338,y+158),CARD,18,LINE)
             icon(d,name,40,y+21,18);text(d,(68,y+22),label,13,MUTED,bold=True)
             text(d,(316,y+22),"修改" if i==0 else "更换新码",12,GREEN,anchor="rt")
-            text(d,(42,y+62),"•••• ••••",31,bold=True)
-            text(d,(42,y+103),"使用码已隐藏",11,MUTED)
-            d.line((40,y+132,320,y+132),fill=LINE)
-            text(d,(42,y+153),"洗浴键盘码" if i==0 else "吹风机键盘码",12,MUTED)
-            switch(d,275,y+148,True)
+            text(d,(42,y+50),"•••• ••••",31,bold=True)
+            text(d,(42,y+88),"使用码已隐藏",11,MUTED)
+            d.line((40,y+112,320,y+112),fill=LINE)
+            text(d,(42,y+130),"洗浴键盘码" if i==0 else "吹风机键盘码",12,MUTED)
+            switch(d,275,y+124,True)
     else:
         text(d,(22,110),"按需登录，随时可以回来补充。",13,MUTED)
-        box(d,(22,157,338,418),CARD,20)
+        box(d,(22,157,338,388),CARD,20)
         for i,(label,purpose,name) in enumerate([("学校账号","付款码 · 余额 · 账单 · 电费","person"),("趣智校园","饮水机 · 吹风机使用码","card"),("趣智热水后勤","洗浴使用码","bath")]):
-            y=180+i*84;icon(d,name,39,y+6,23);text(d,(77,y),label,14,bold=True)
+            y=176+i*74;icon(d,name,39,y+6,23);text(d,(77,y),label,14,bold=True)
             text(d,(77,y+27),purpose,11,MUTED);text(d,(317,y+11),"去登录 ›",11,GREEN,anchor="rt")
-            if i<2:d.line((39,y+64,321,y+64),fill=LINE)
-        box(d,(22,446,338,491),GREEN,13);text(d,(180,458),"稍后登录",14,CARD,anchor="mt")
+            if i<2:d.line((39,y+60,321,y+60),fill=LINE)
+        box(d,(22,416,338,461),GREEN,13);text(d,(180,428),"稍后登录",14,CARD,anchor="mt")
     return image
 
 
-def phone(canvas, kind, x, y, width=330):
-    h=round(width*780/360); pad=12
+@lru_cache(maxsize=1)
+def casing():
+    scale=3
+    width=(PHONE_WIDTH+FRAME_PAD*2)*scale
+    height=(PHONE_HEIGHT+FRAME_PAD*2)*scale
+    body=Image.new('RGBA',(width,height));d=ImageDraw.Draw(body)
+    top,bottom=(255,249,235),(202,185,156)
+    for y in range(height):
+        t=y/(height-1)
+        color=tuple(round(a+(b-a)*t) for a,b in zip(top,bottom))
+        d.line((0,y,width,y),fill=color+(255,))
+    mask=Image.new('L',body.size)
+    box(ImageDraw.Draw(mask),(0,0,width-1,height-1),255,46*scale)
+    body.putalpha(mask)
+    for inset,color,stroke in [(0,'#C7B89F',1),(2,'#FFFCF4',2),(5,'#DFD0B5',3),(8,'#FFF9EF',2)]:
+        box(d,(inset*scale,inset*scale,width-1-inset*scale,height-1-inset*scale),None,
+            (46-inset)*scale,color,stroke*scale)
+    return body.resize((width//scale,height//scale),Image.Resampling.LANCZOS)
+
+
+def phone(canvas, kind, x):
+    width,h,pad,y=PHONE_WIDTH,PHONE_HEIGHT,FRAME_PAD,PHONE_TOP
     shadow=Image.new("RGBA",canvas.size)
-    box(ImageDraw.Draw(shadow),(x-8,y+10,x+width+8,y+h+14),(40,48,42,25),38)
-    canvas.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(14)))
-    d=ImageDraw.Draw(canvas)
-    box(d,(x-pad,y-pad,x+width+pad,y+h+pad),"#C9BBA5",46)
-    box(d,(x-pad+2,y-pad+2,x+width+pad-2,y+h+pad-2),"#FFF9EE",44)
-    box(d,(x-7,y-7,x+width+7,y+h+7),"#E4D8C5",39)
-    box(d,(x-4,y-4,x+width+4,y+h+4),"#F6F0E3",36)
+    box(ImageDraw.Draw(shadow),(x-pad,y+8,x+width+pad,y+h+28),(108,93,66,55),46)
+    canvas.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(19)))
+    canvas.alpha_composite(casing(),(x-pad,y-pad))
     art=screen(kind).resize((width,h),Image.Resampling.LANCZOS)
     mask=Image.new("L",art.size);box(ImageDraw.Draw(mask),(0,0,width-1,h-1),255,33)
     canvas.paste(art,(x,y),mask)
+
+
+def background():
+    canvas=Image.new('RGBA',POSTER_SIZE)
+    d=ImageDraw.Draw(canvas)
+    for y in range(POSTER_SIZE[1]):
+        t=y/(POSTER_SIZE[1]-1)
+        color=tuple(round(a+(b-a)*t) for a,b in zip((255,252,243),(242,242,230)))
+        d.line((0,y,POSTER_SIZE[0],y),fill=color+(255,))
+    folds=Image.new('RGBA',POSTER_SIZE);f=ImageDraw.Draw(folds)
+    f.polygon([(0,920),(1600,300),(1600,1000),(0,1000)],fill=(200,212,184,48))
+    f.polygon([(0,1000),(1600,670),(1600,1000)],fill=(187,203,170,35))
+    canvas.alpha_composite(folds)
+    return canvas
 
 
 def footer(draw, width, height):
@@ -173,25 +207,37 @@ def footer(draw, width, height):
 
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--final',action='store_true',help='Export the approved fixed template to assets/promo')
+    args=parser.parse_args()
     if not FONT.exists():raise SystemExit("请配置 Microsoft YaHei 字体路径。")
-    OUT.mkdir(parents=True,exist_ok=True)
-    cover=Image.new("RGBA",(1600,1000),PAPER);d=ImageDraw.Draw(cover)
+    output=ROOT/'assets/promo' if args.final else OUT
+    output.mkdir(parents=True,exist_ok=True)
+    cover=background();d=ImageDraw.Draw(cover)
     brand=Image.open(ROOT/'assets/mudlife-icon-preview.png').convert('RGBA').resize((96,96),Image.Resampling.LANCZOS)
-    cover.alpha_composite(brand,(82,85));text(d,(202,104),"泥浆生活",34,bold=True);text(d,(204,152),"MudLife",20,MUTED)
-    text(d,(82,306),"校园日常",70,bold=True);text(d,(82,409),"放在一起",70,bold=True)
-    text(d,(85,536),"付款、账单、饮水与使用码",27,MUTED)
+    cover.alpha_composite(brand,(82,70));text(d,(202,86),"泥浆生活",34,GREEN,bold=True);text(d,(204,134),"MudLife",20,MUTED)
+    text(d,(82,292),"校园日常",70,GREEN,bold=True);text(d,(82,394),"放在一起",70,GREEN,bold=True)
+    text(d,(85,522),"付款、账单、饮水与使用码",27,MUTED)
     for i,label in enumerate(["温暖纸色","轻触反馈","账号独立保存"]):
-        x=85+i*174;box(d,(x,624,x+155,668),"#E8ECE3",22);text(d,(x+77,635),label,18,GREEN,anchor="mt")
-    phone(cover,'bills',790,165,315);phone(cover,'card',1167,125,315)
-    footer(d,1600,1000);cover.convert('RGB').save(OUT/'overview.png',optimize=True)
-    billing=Image.new('RGBA',(1080,1600),PAPER);d=ImageDraw.Draw(billing)
-    text(d,(74,80),"生活账单，一目了然",54,bold=True);text(d,(78,167),"余额在上方，饮食与洗浴开支在下方。",27,MUTED)
-    phone(billing,'bills',276,286,528);footer(d,1080,1600);billing.convert('RGB').save(OUT/'bills.png',optimize=True)
-    daily=Image.new('RGBA',(1600,1180),PAPER);d=ImageDraw.Draw(daily)
-    text(d,(76,62),"顺手使用，按需登录",58,bold=True);text(d,(80,151),"常用饮水机、两组使用码，以及清晰的账号入口。",27,MUTED)
-    for kind,x in [('home',154),('codes',635),('accounts',1116)]:phone(daily,kind,x,275,330)
-    footer(d,1600,1180);daily.convert('RGB').save(OUT/'daily.png',optimize=True)
-    print('Rendered overview.png, bills.png and daily.png with fictional data only.')
+        x=85+i*174;box(d,(x,610,x+155,654),"#E8ECE3",22);text(d,(x+77,621),label,18,GREEN,anchor="mt")
+    phone(cover,'bills',785);phone(cover,'card',1195)
+    footer(d,*POSTER_SIZE);cover.convert('RGB').save(output/'overview.png',optimize=True)
+    billing=background();d=ImageDraw.Draw(billing)
+    text(d,(76,52),"生活账单，一目了然",54,GREEN,bold=True)
+    text(d,(80,125),"余额在上方，饮食与洗浴开支在下方。",26,MUTED)
+    for i,(name,title,description) in enumerate([('card','余额与充值','校园卡余额，集中查看'),('food','分类看流水','饮食、洗澡、充值，按月整理'),('bills','只统计支出','充值保留明细，不计入消费')]):
+        y=298+i*142
+        box(d,(82,y,160,y+78),'#E8ECE3',39);icon(d,name,104,y+22,34)
+        text(d,(192,y+1),title,29,GREEN,bold=True);text(d,(192,y+47),description,24,MUTED)
+    billing.alpha_composite(brand.resize((72,72),Image.Resampling.LANCZOS),(82,790))
+    text(d,(175,802),'泥浆生活 · MudLife',24,GREEN)
+    phone(billing,'bills',1110);footer(d,*POSTER_SIZE);billing.convert('RGB').save(output/'bills.png',optimize=True)
+    daily=background();d=ImageDraw.Draw(daily)
+    text(d,(76,52),"顺手使用，按需登录",54,GREEN,bold=True)
+    text(d,(80,125),"常用饮水机、两组使用码，以及清晰的账号入口。",26,MUTED)
+    for kind,x in [('home',150),('codes',635),('accounts',1120)]:phone(daily,kind,x)
+    footer(d,*POSTER_SIZE);daily.convert('RGB').save(output/'daily.png',optimize=True)
+    print(f'Exported 3 posters: {POSTER_SIZE}, each device {PHONE_WIDTH+FRAME_PAD*2}x{PHONE_HEIGHT+FRAME_PAD*2}px, shared top={PHONE_TOP-FRAME_PAD}px.')
 
 
 if __name__=='__main__':main()
