@@ -80,6 +80,9 @@ object AppLogger {
     var versionState by mutableStateOf(0L)
         private set
 
+    var errorCountState by mutableStateOf(0)
+        private set
+
     fun init(context: Context) {
         if (appContext != null) return
         appContext = context.applicationContext
@@ -154,8 +157,9 @@ object AppLogger {
 
         // 环形内存缓冲
         logList.addLast(entry)
+        if (level == LogLevel.ERROR) errorCountState++
         while (logList.size > MAX_MEMORY_LOGS) {
-            logList.removeFirst()
+            if (logList.removeFirst().level == LogLevel.ERROR) errorCountState--
         }
 
         // 文件持久化追加
@@ -176,6 +180,7 @@ object AppLogger {
     @Synchronized
     fun clear() {
         logList.clear()
+        errorCountState = 0
         try {
             logFile?.writeText("")
         } catch (_: Exception) {}

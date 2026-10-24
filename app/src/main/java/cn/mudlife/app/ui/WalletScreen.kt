@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import cn.mudlife.app.model.BillDTO
 import cn.mudlife.app.model.BillItem
 import cn.mudlife.app.model.DeviceInfo
+import cn.mudlife.app.ui.theme.paperBackground
 import cn.mudlife.app.ui.theme.AppColors
 import cn.mudlife.app.utils.HapticHelper
 import kotlinx.coroutines.launch
@@ -146,7 +148,7 @@ fun WalletScreen(viewModel: MainViewModel) {
                 ) {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("账单明细", fontSize = 23.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+                            Text("账单明细", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                             Spacer(Modifier.width(8.dp))
                             // 月份下拉选择器
                             Box {
@@ -218,7 +220,7 @@ fun WalletScreen(viewModel: MainViewModel) {
                         Spacer(Modifier.height(3.dp))
                         Text(
                             if (selectedMonth == "ALL") "近 6 个月记录 · 按月分组流水" else "展示 ${formatMonthDisplay(selectedMonth)} 的账单记录",
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             color = AppColors.TextSecondary
                         )
                     }
@@ -233,9 +235,9 @@ fun WalletScreen(viewModel: MainViewModel) {
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.End
                         ) {
-                            Text(spentTitle, fontSize = 11.sp, color = AppColors.TextSecondary)
+                            Text(spentTitle, fontSize = 13.sp, color = AppColors.TextSecondary)
                             Text("¥ %.2f".format(totalSpent), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
-                            Text("${displayedBills.size} 笔", fontSize = 10.sp, color = AppColors.TextSecondary)
+                            Text("${displayedBills.size} 笔", fontSize = 12.sp, color = AppColors.TextSecondary)
                         }
                     }
                 }
@@ -267,13 +269,13 @@ fun WalletScreen(viewModel: MainViewModel) {
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(category.emoji, fontSize = 13.sp)
+                                Icon(deviceSymbol(category.emoji), null, tint = if (isSelected) AppColors.OnAccent else AppColors.TextSecondary, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(3.dp))
                                 Text(
                                     category.title,
                                     fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Color.White else AppColors.TextPrimary
+                                    color = if (isSelected) AppColors.OnAccent else AppColors.TextPrimary
                                 )
                             }
                         }
@@ -290,7 +292,7 @@ fun WalletScreen(viewModel: MainViewModel) {
                 } else if (displayedBills.isEmpty()) {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(selectedCategory.emoji, fontSize = 38.sp)
+                            Icon(deviceSymbol(selectedCategory.emoji), null, tint = AppColors.TextSecondary, modifier = Modifier.size(32.dp))
                             Spacer(Modifier.height(8.dp))
                             Text("暂无此类消费账单", color = AppColors.TextSecondary, fontSize = 14.sp)
                         }
@@ -298,7 +300,7 @@ fun WalletScreen(viewModel: MainViewModel) {
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                         contentPadding = PaddingValues(bottom = 110.dp)
                     ) {
                         monthGroups.forEach { (monthKey, billsInMonth) ->
@@ -316,14 +318,14 @@ fun WalletScreen(viewModel: MainViewModel) {
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            "📅 ${formatMonthDisplay(monthKey)}",
+                                            formatMonthDisplay(monthKey),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = AppColors.TextPrimary
                                         )
                                         Text(
                                             "支出 ¥%.2f · %d笔".format(groupSpent, billsInMonth.size),
-                                            fontSize = 11.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = AppColors.TextSecondary
                                         )
@@ -409,9 +411,9 @@ private fun BillCard(bill: BillItem, onClick: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val tagColor = when {
-                        dto.deviceTypeLabel.contains("直饮") -> Color(0xFF00897B)
-                        dto.deviceTypeLabel.contains("吹风") -> Color(0xFF8E24AA)
-                        dto.deviceTypeLabel.contains("洗手台") -> Color(0xFFFB8C00)
+                        dto.deviceTypeLabel.contains("直饮") -> AppColors.Cold
+                        dto.deviceTypeLabel.contains("吹风") -> AppColors.TextSecondary
+                        dto.deviceTypeLabel.contains("洗手台") -> AppColors.Hot
                         else -> AppColors.Accent
                     }
                     Text(

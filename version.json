@@ -1,12 +1,11 @@
 {
-  "versionCode": 24,
-  "versionName": "1.3.16",
-  "releaseDate": "2026-09-16",
-  "title": "MudLife v1.3.16",
-  "changelog": "架构彻底重构与硬件场景精准对齐：\n\n业务场景对齐：依本校硬件现状全面重构，趣智校园专用于直饮水机与吹风机，趣智后勤热水专用于浴室洗浴；彻底厘清手机端边界，去除虚假的洗浴关阀控制；\n剥离前身遗留无用代码：全面剔除“linyu”前身为其他学校开发的蓝牙低功耗扫描探测（NearbyDevice / BLE）、洗手台（Washbasin）、寝室绑定（boundRoom）等全部冗余逻辑与数据类；\n直饮水机 0.2s 极速探活：秒表走秒与网络探活完全解耦，后台探活协程以 200ms (0.2s) 超高灵敏度轮询设备状态，机身物理按键关闭出水即刻感知并结算；\n关水安全兜底与防丢单保护：出水停止流程加入双层关闭核验，关水未确认成功绝不强行清除活跃订单，提醒用户现场复核，杜绝扣费丢单风险；\n常用饮水机多校区账户保护：修复设备卡片更新时丢失已绑定 projectId 的问题，确保跨校区、多项目账户映射准确无误；\n网络与日志安全强化：验证码请求豁免 GET 自动重试防止触发防刷；AppLogger 增加对使用码、密钥与验证码的全局正则脱敏；收敛 FileProvider 目录权限；修复 CameraX 相机特性声明与 API 兼容。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.3.16/MudLife-v1.3.16.apk",
+  "versionCode": 34,
+  "versionName": "1.4.5",
+  "releaseDate": "2026-10-24",
+  "title": "MudLife v1.4.5",
+  "changelog": "校园日常，放在一起。\n\n· 融合学校一卡通、趣智校园与趣智热水后勤，首次安装可按需登录。\n· 校园卡余额移至账单顶部，按饮食、洗澡、充值等分类，只统计学校校园卡支出。\n· 使用码同时展示洗浴码与吹风机码，优化页面、动画、触感和通知。\n· 换用「校园之门」图标，保留温暖纸黄色调。\n· 新增 Gitee 国内更新源，优先从 Gitee 下载；安装前验证版本与固定签名。\n· 完善项目主页和脱敏宣传图，GitHub/Gitee 同步发行。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.4.5/MudLife-1.4.5.apk",
   "mirrors": [
-    "https://ghfast.top/https://github.com/Cainite07/MudLife/releases/download/v1.3.16/MudLife-v1.3.16.apk",
-    "https://ghproxy.net/https://github.com/Cainite07/MudLife/releases/download/v1.3.16/MudLife-v1.3.16.apk"
+    "https://gitee.com/cainite/MudLife/releases/download/v1.4.5/MudLife-1.4.5.apk"
   ]
 }

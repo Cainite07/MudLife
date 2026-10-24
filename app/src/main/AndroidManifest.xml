@@ -6,10 +6,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
+
+    <queries><package android:name="com.tencent.mm" /></queries>
 
     <application
         android:networkSecurityConfig="@xml/network_security_config"
@@ -32,9 +35,16 @@
         </activity>
 
         <activity
+            android:name=".CampusCardActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".QrScanActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+
+        <activity android:name="cn.mudlife.campuscard.SchoolActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -12,6 +12,8 @@ import cn.mudlife.app.model.LoginData
 import cn.mudlife.app.model.OrderStatus
 import cn.mudlife.app.model.UseCodeData
 import cn.mudlife.app.model.WalletData
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.ResponseBody
 import retrofit2.Call
@@ -46,8 +48,8 @@ private suspend fun Call<ResponseBody>.awaitString(): String {
     }
 }
 
-private fun <T> parse(json: String, dataClass: Class<T>): BaseResponse<T> {
-    return try {
+private suspend fun <T> parse(json: String, dataClass: Class<T>): BaseResponse<T> = withContext(Dispatchers.Default) {
+        try {
         val obj = JsonParser.parseString(json).asJsonObject
         val success = obj.get("success")?.let { if (it.isJsonNull) false else it.asBoolean } ?: false
         val errorCode = obj.get("errorCode")?.let { if (it.isJsonNull) 0 else it.asInt } ?: 0
@@ -63,8 +65,8 @@ private fun <T> parse(json: String, dataClass: Class<T>): BaseResponse<T> {
     }
 }
 
-private fun <T> parseList(json: String, elementClass: Class<T>): BaseResponse<List<T>> {
-    return try {
+private suspend fun <T> parseList(json: String, elementClass: Class<T>): BaseResponse<List<T>> = withContext(Dispatchers.Default) {
+        try {
         val obj = JsonParser.parseString(json).asJsonObject
         val success = obj.get("success")?.let { if (it.isJsonNull) false else it.asBoolean } ?: false
         val errorCode = obj.get("errorCode")?.let { if (it.isJsonNull) 0 else it.asInt } ?: 0

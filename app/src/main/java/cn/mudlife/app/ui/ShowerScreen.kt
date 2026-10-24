@@ -1,6 +1,5 @@
 package cn.mudlife.app.ui
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -9,6 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cn.mudlife.app.ui.theme.paperBackground
 import cn.mudlife.app.ui.theme.AppColors
 import cn.mudlife.app.utils.HapticHelper
 
@@ -37,36 +39,13 @@ fun ShowerScreen(
     onStopClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val isDark = AppColors.isDark
     val minutes = elapsedSec / 60
     val seconds = elapsedSec % 60
     val timeFormatted = "%02d:%02d".format(minutes, seconds)
 
-    // 水滴柔光轻微呼吸动画 (0.95 -> 1.12)
-    val infiniteTransition = rememberInfiniteTransition(label = "waterPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 0.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppColors.Background)
     ) {
         Column(
             modifier = Modifier
@@ -78,38 +57,21 @@ fun ShowerScreen(
         ) {
             Spacer(Modifier.height(10.dp))
 
-            // 1. 生动出水图标 + 柔光呼吸动效环
+            // A static vector keeps the running page calm and avoids continuous decoration redraws.
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(96.dp)
                     .padding(bottom = 12.dp)
             ) {
-                // 外层呼吸波纹
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .scale(pulseScale)
-                        .clip(CircleShape)
-                        .background(
-                            if (isDark) Color(0xFF38BDF8).copy(alpha = pulseAlpha)
-                            else Color(0xFF0284C7).copy(alpha = pulseAlpha)
-                        )
-                )
-                // 内层晶体核心图标底板
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(26.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = if (isDark) listOf(Color(0xFF0284C7), Color(0xFF2563EB))
-                                else listOf(Color(0xFF38BDF8), Color(0xFF2563EB))
-                            )
-                        )
+                        .size(68.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(AppColors.Accent.copy(alpha = 0.10f))
                 ) {
-                    Text(emoji, fontSize = 42.sp)
+                    Icon(deviceSymbol(emoji), null, tint = AppColors.Accent, modifier = Modifier.size(34.dp))
                 }
             }
 
@@ -122,7 +84,7 @@ fun ShowerScreen(
                     modifier = Modifier
                         .size(9.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF10B981))
+                        .background(AppColors.Success)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -143,12 +105,12 @@ fun ShowerScreen(
                 fontWeight = FontWeight.Medium
             )
 
-            Spacer(Modifier.height(30.dp))
+            Spacer(Modifier.height(24.dp))
 
             // 3. 实时出水计时卡片（白玉亚克力/沉浸黑曜石微透晶体，彻底去除旧版多余白块与模糊阴影）
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = AppColors.Card),
                 border = BorderStroke(1.dp, AppColors.Border),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -156,7 +118,7 @@ fun ShowerScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 24.dp, horizontal = 20.dp),
+                        .padding(vertical = 20.dp, horizontal = 18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -172,7 +134,7 @@ fun ShowerScreen(
                     ) {
                         Text(
                             timeFormatted,
-                            fontSize = 42.sp,
+                            fontSize = 38.sp,
                             fontWeight = FontWeight.Black,
                             color = AppColors.Accent,
                             fontFamily = FontFamily.Monospace,
@@ -205,7 +167,7 @@ fun ShowerScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("⏳", fontSize = 14.sp)
+                        Icon(Icons.Outlined.Timer, null, tint = AppColors.Warning, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(
                             "闲置约 $countdownText 后自动关停",
@@ -231,8 +193,8 @@ fun ShowerScreen(
                     .height(54.dp),
                 enabled = !isStopping,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF4444),
-                    disabledContainerColor = Color(0xFFEF4444).copy(alpha = 0.45f)
+                    containerColor = AppColors.Danger,
+                    disabledContainerColor = AppColors.Danger.copy(alpha = 0.45f)
                 ),
                 shape = RoundedCornerShape(18.dp),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
@@ -241,12 +203,12 @@ fun ShowerScreen(
                     CircularProgressIndicator(
                         Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = Color.White
+                        color = AppColors.OnAccent
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         "正在关闭...",
-                        color = Color.White,
+                        color = AppColors.OnAccent,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp
@@ -254,7 +216,7 @@ fun ShowerScreen(
                 } else {
                     Text(
                         "结 束 用 水",
-                        color = Color.White,
+                        color = AppColors.OnAccent,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp

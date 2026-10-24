@@ -5,36 +5,39 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.sp
 
 enum class ThemeMode { LIGHT, DARK }
 
-// ── Light palette (现代 MD3 浅色清新充盈灵透白玉调色) ──
+// Paper, warm ink and muted olive. Geometry belongs to the existing screens.
 val LightColors = AppColorSet(
-    Background = Color(0xFFF1F5F9), // 清新珍珠浅底
-    Card = Color(0xFFFFFFFF),       // 100% 高纯白玉实体，清晰挺拔立于背景之上
-    SolidSurface = Color(0xFFFFFFFF),// 100% 纯白实体，彻底杜绝叠加透视
-    Primary = Color(0xFF0F172A),
-    Accent = Color(0xFF1E40AF),
-    TextPrimary = Color(0xFF0F172A),
-    TextSecondary = Color(0xFF64748B),
-    Success = Color(0xFF16A34A), Warning = Color(0xFFD97706),
-    Danger = Color(0xFFDC2626), ActiveBg = Color(0x201E40AF),
-    SurfaceVariant = Color(0xEEF1F5F9), Border = Color(0x140F172A), // 细致灰晶微光描边
+    Background = Color(0xFFF6F3EB),
+    Card = Color(0xFFFFFDF8),
+    SolidSurface = Color(0xFFFFFDF8),
+    Primary = Color(0xFF292F2B),
+    Accent = Color(0xFF344E43),
+    TextPrimary = Color(0xFF292F2B),
+    TextSecondary = Color(0xFF777B71),
+    Success = Color(0xFF537051), Warning = Color(0xFF98632D),
+    Danger = Color(0xFFA34636), ActiveBg = Color(0xFFE8ECE3),
+    SurfaceVariant = Color(0xFFE8ECE3), Border = Color(0xFFE4E3D8),
     isDark = false
 )
 
-// ── Dark palette (现代 MD3 深度星空微透磨砂调色) ──
+// A warm reading palette for the existing dark-mode switch.
 val DarkColors = AppColorSet(
-    Background = Color(0xFF0E131D), // 极具纵深的沉浸墨底色
-    Card = Color(0xFF161D29),       // 100% 实体黑曜石深邃卡片色，明度层次鲜明
-    SolidSurface = Color(0xFF1E2430),// 100% 实体暗色，彻底杜绝叠加透视
-    Primary = Color(0xFFFFFFFF),
-    Accent = Color(0xFFA8C7FA),
-    TextPrimary = Color(0xFFFFFFFF),
-    TextSecondary = Color(0xFF94A3B8),
-    Success = Color(0xFF34D399), Warning = Color(0xFFFBBF24),
-    Danger = Color(0xFFF87171), ActiveBg = Color(0x301E293B),
-    SurfaceVariant = Color(0xCC242C3A), Border = Color(0x20FFFFFF), // 高光晶体物理微描边
+    Background = Color(0xFF24221C),
+    Card = Color(0xFF302D25),
+    SolidSurface = Color(0xFF353127),
+    Primary = Color(0xFFEDE4D1),
+    Accent = Color(0xFFC4C79C),
+    TextPrimary = Color(0xFFEDE4D1),
+    TextSecondary = Color(0xFFB8AC94),
+    Success = Color(0xFFA3BE8F), Warning = Color(0xFFD6B47D),
+    Danger = Color(0xFFE4A08C), ActiveBg = Color(0xFF424633),
+    SurfaceVariant = Color(0xFF3B372D), Border = Color(0xFF514A3B),
     isDark = true
 )
 
@@ -67,6 +70,9 @@ object AppColors {
     val Danger: Color @Composable get() = LocalAppColors.current.Danger
     val ActiveBg: Color @Composable get() = LocalAppColors.current.ActiveBg
     val Border: Color @Composable get() = LocalAppColors.current.Border
+    val OnAccent: Color @Composable get() = if (isDark) Color(0xFF2D3321) else Color(0xFFFFFCF4)
+    val Cold: Color @Composable get() = if (isDark) Color(0xFFA9C1C5) else Color(0xFF527783)
+    val Hot: Color @Composable get() = if (isDark) Color(0xFFD7AF87) else Color(0xFFAC7748)
     val isDark: Boolean @Composable get() = LocalAppColors.current.isDark
 }
 
@@ -81,7 +87,13 @@ fun MudLifeThemeSpecific(mode: ThemeMode, content: @Composable () -> Unit) {
         surfaceContainer = set.SolidSurface,
         surfaceContainerHigh = set.SolidSurface,
         surfaceContainerHighest = set.SolidSurface,
-        onPrimary = Color(0xFF062E6F),
+        onPrimary = Color(0xFF2D3321),
+        onSurface = set.TextPrimary,
+        onBackground = set.TextPrimary,
+        onSurfaceVariant = set.TextSecondary,
+        outline = set.Border,
+        outlineVariant = set.Border,
+        error = set.Danger,
         secondary = set.TextSecondary,
         surfaceVariant = set.SurfaceVariant
     ) else lightColorScheme(
@@ -91,12 +103,27 @@ fun MudLifeThemeSpecific(mode: ThemeMode, content: @Composable () -> Unit) {
         surfaceContainer = set.SolidSurface,
         surfaceContainerHigh = set.SolidSurface,
         surfaceContainerHighest = set.SolidSurface,
-        onPrimary = Color.White,
+        onPrimary = Color(0xFFFFFCF4),
+        onSurface = set.TextPrimary,
+        onBackground = set.TextPrimary,
+        onSurfaceVariant = set.TextSecondary,
+        outline = set.Border,
+        outlineVariant = set.Border,
+        error = set.Danger,
         secondary = set.TextSecondary,
         surfaceVariant = set.SurfaceVariant
     )
     CompositionLocalProvider(LocalAppColors provides set) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        val base = remember { Typography() }
+        MaterialTheme(colorScheme = scheme, typography = base.copy(
+            bodyLarge = base.bodyLarge.copy(fontSize = 14.sp, lineHeight = 20.sp),
+            bodyMedium = base.bodyMedium.copy(fontSize = 13.sp, lineHeight = 19.sp),
+            bodySmall = base.bodySmall.copy(fontSize = 12.sp, lineHeight = 17.sp),
+            headlineLarge = base.headlineLarge.copy(fontFamily = FontFamily.Serif),
+            headlineMedium = base.headlineMedium.copy(fontFamily = FontFamily.Serif),
+            headlineSmall = base.headlineSmall.copy(fontFamily = FontFamily.Serif),
+            titleLarge = base.titleLarge.copy(fontFamily = FontFamily.Serif)
+        ), content = content)
     }
 }
 

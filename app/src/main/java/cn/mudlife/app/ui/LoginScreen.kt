@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +34,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -40,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.mudlife.app.R
+import cn.mudlife.app.ui.theme.paperBackground
 import cn.mudlife.app.ui.theme.AppColors
 import cn.mudlife.app.ui.theme.LocalThemeReveal
 import cn.mudlife.app.utils.HapticHelper
@@ -47,13 +51,13 @@ import cn.mudlife.app.utils.HapticHelper
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = viewModel(),
-    onLoginSuccess: (String) -> Unit
+    onLoginSuccess: (String) -> Unit,
+    onCampusCard: () -> Unit,
+    onBack: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val isDark = AppColors.isDark
 
-    var animated by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (animated) 1f else 0.88f, tween(450))
 
     LaunchedEffect(viewModel.loginResult) {
         val result = viewModel.loginResult
@@ -63,74 +67,48 @@ fun LoginScreen(
         }
     }
 
-    LaunchedEffect(Unit) { animated = true }
 
-    // 充盈灵透漫反射流光底板（浅色：天蓝珍珠白流光 / 深色：深空极光暗底）
-    val bgBrush = if (isDark) {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF0B101B),
-                Color(0xFF0F172A),
-                Color(0xFF080C14)
-            )
-        )
-    } else {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFFEBF3FC),
-                Color(0xFFE2ECF8),
-                Color(0xFFF5F8FC)
-            )
-        )
-    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(brush = bgBrush)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .scale(scale)
                 .verticalScroll(rememberScrollState())
-                .statusBarsPadding()
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // 顶部 Logo 徽标与光晕
+            // The same restrained vector family as the device controls.
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.padding(bottom = 12.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(88.dp)
-                        .clip(RoundedCornerShape(26.dp))
-                        .background(if (isDark) Color(0x2038BDF8) else Color(0x250284C7))
-                )
-                Image(
-                    painter = painterResource(R.drawable.app_logo),
-                    contentDescription = "logo",
-                    modifier = Modifier
-                        .size(76.dp)
+                        .size(72.dp)
                         .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0xFFF1E6C9))
                 )
+                Image(painterResource(R.mipmap.ic_launcher_foreground), "泥浆生活", modifier = Modifier.size(72.dp))
             }
 
             Text(
                 "泥浆生活",
+                fontFamily = FontFamily.Serif,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,
-                color = if (isDark) Color.White else Color(0xFF0F172A),
+                color = AppColors.TextPrimary,
                 letterSpacing = 0.5.sp
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "专注纯净校园供水与洗浴生活",
+                "趣智校园账号登录",
                 fontSize = 12.sp,
-                color = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B),
+                color = AppColors.TextSecondary,
                 fontWeight = FontWeight.Medium
             )
 
@@ -139,30 +117,30 @@ fun LoginScreen(
             // 🌟 核心悬浮充盈灵透晶体卡片 (浅色白玉高透 / 深色极光星幕) 🌟
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isDark) Color(0xD8151D2C) else Color(0xB8FFFFFF)
+                    containerColor = AppColors.Card
                 ),
                 border = BorderStroke(
                     1.dp,
-                    if (isDark) Color(0x28FFFFFF) else Color(0xD8FFFFFF)
+                    AppColors.Border
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 24.dp),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         "欢迎回来",
                         fontSize = 21.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                        color = AppColors.TextPrimary
                     )
                     Text(
-                        "请使用校园账号登录",
+                        "饮水机与吹风机使用码",
                         fontSize = 12.sp,
-                        color = if (isDark) Color.White.copy(alpha = 0.55f) else Color(0xFF64748B),
+                        color = AppColors.TextSecondary,
                         modifier = Modifier.padding(top = 4.dp, bottom = 18.dp)
                     )
 
@@ -179,7 +157,7 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(44.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(if (isDark) Color(0x18FFFFFF) else Color(0x10000000))
+                            .background(AppColors.Border)
                             .padding(3.dp)
                     ) {
                         val pillWidth = maxWidth / 2
@@ -191,7 +169,7 @@ fun LoginScreen(
                                 .fillMaxHeight()
                                 .offset(x = pillWidth * sliderProgress)
                                 .clip(RoundedCornerShape(11.dp))
-                                .background(Color(0xFF2563EB))
+                                .background(AppColors.Accent)
                         )
 
                         Row(modifier = Modifier.fillMaxSize()) {
@@ -213,7 +191,7 @@ fun LoginScreen(
                                     "密码登录",
                                     fontSize = 13.sp,
                                     fontWeight = if (isPwd) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isPwd) Color.White else (if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B))
+                                    color = if (isPwd) AppColors.OnAccent else AppColors.TextSecondary
                                 )
                             }
                             Box(
@@ -234,7 +212,7 @@ fun LoginScreen(
                                     "验证码登录",
                                     fontSize = 13.sp,
                                     fontWeight = if (!isPwd) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (!isPwd) Color.White else (if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B))
+                                    color = if (!isPwd) AppColors.OnAccent else AppColors.TextSecondary
                                 )
                             }
                         }
@@ -251,7 +229,7 @@ fun LoginScreen(
                             Icon(
                                 Icons.Default.Phone,
                                 null,
-                                tint = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB)
+                                tint = AppColors.Accent
                             )
                         },
                         trailingIcon = {
@@ -259,7 +237,7 @@ fun LoginScreen(
                                 IconButton(onClick = { viewModel.phone = "" }) {
                                     Text(
                                         "✕",
-                                        color = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B),
+                                        color = AppColors.TextSecondary,
                                         fontSize = 12.sp
                                     )
                                 }
@@ -270,14 +248,14 @@ fun LoginScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = if (isDark) Color(0x18FFFFFF) else Color(0x75FFFFFF),
-                            unfocusedContainerColor = if (isDark) Color(0x10FFFFFF) else Color(0x55FFFFFF),
-                            focusedBorderColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB),
-                            unfocusedBorderColor = if (isDark) Color(0x20FFFFFF) else Color(0x20000000),
-                            focusedTextColor = if (isDark) Color.White else Color(0xFF0F172A),
-                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF0F172A),
-                            focusedLabelColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB),
-                            unfocusedLabelColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+                            focusedContainerColor = AppColors.Card,
+                            unfocusedContainerColor = AppColors.Card,
+                            focusedBorderColor = AppColors.Accent,
+                            unfocusedBorderColor = AppColors.Border,
+                            focusedTextColor = AppColors.TextPrimary,
+                            unfocusedTextColor = AppColors.TextPrimary,
+                            focusedLabelColor = AppColors.Accent,
+                            unfocusedLabelColor = AppColors.TextSecondary
                         )
                     )
 
@@ -292,7 +270,7 @@ fun LoginScreen(
                                     Icon(
                                         Icons.Default.Lock,
                                         null,
-                                        tint = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB)
+                                        tint = AppColors.Accent
                                     )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
@@ -301,14 +279,14 @@ fun LoginScreen(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = if (isDark) Color(0x18FFFFFF) else Color(0x75FFFFFF),
-                                    unfocusedContainerColor = if (isDark) Color(0x10FFFFFF) else Color(0x55FFFFFF),
-                                    focusedBorderColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB),
-                                    unfocusedBorderColor = if (isDark) Color(0x20FFFFFF) else Color(0x20000000),
-                                    focusedTextColor = if (isDark) Color.White else Color(0xFF0F172A),
-                                    unfocusedTextColor = if (isDark) Color.White else Color(0xFF0F172A),
-                                    focusedLabelColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB),
-                                    unfocusedLabelColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+                                    focusedContainerColor = AppColors.Card,
+                                    unfocusedContainerColor = AppColors.Card,
+                                    focusedBorderColor = AppColors.Accent,
+                                    unfocusedBorderColor = AppColors.Border,
+                                    focusedTextColor = AppColors.TextPrimary,
+                                    unfocusedTextColor = AppColors.TextPrimary,
+                                    focusedLabelColor = AppColors.Accent,
+                                    unfocusedLabelColor = AppColors.TextSecondary
                                 )
                             )
 
@@ -326,8 +304,8 @@ fun LoginScreen(
                                 enabled = !viewModel.isLoading,
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2563EB),
-                                    disabledContainerColor = Color(0xFF1D4ED8).copy(alpha = 0.5f)
+                                    containerColor = AppColors.Accent,
+                                    disabledContainerColor = AppColors.Accent.copy(alpha = 0.5f)
                                 ),
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                             ) {
@@ -342,7 +320,7 @@ fun LoginScreen(
                             Text(
                                 "若忘记密码请在支付宝「趣智校园」中重置",
                                 fontSize = 11.sp,
-                                color = if (isDark) Color.White.copy(alpha = 0.5f) else Color(0xFF64748B),
+                                color = AppColors.TextSecondary,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -360,7 +338,7 @@ fun LoginScreen(
                                         Icon(
                                             Icons.Default.Lock,
                                             null,
-                                            tint = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB)
+                                            tint = AppColors.Accent
                                         )
                                     },
                                     modifier = Modifier.weight(1f),
@@ -368,14 +346,14 @@ fun LoginScreen(
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = if (isDark) Color(0x18FFFFFF) else Color(0x75FFFFFF),
-                                        unfocusedContainerColor = if (isDark) Color(0x10FFFFFF) else Color(0x55FFFFFF),
-                                        focusedBorderColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB),
-                                        unfocusedBorderColor = if (isDark) Color(0x20FFFFFF) else Color(0x20000000),
-                                        focusedTextColor = if (isDark) Color.White else Color(0xFF0F172A),
-                                        unfocusedTextColor = if (isDark) Color.White else Color(0xFF0F172A),
-                                        focusedLabelColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB),
-                                        unfocusedLabelColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+                                        focusedContainerColor = AppColors.Card,
+                                        unfocusedContainerColor = AppColors.Card,
+                                        focusedBorderColor = AppColors.Accent,
+                                        unfocusedBorderColor = AppColors.Border,
+                                        focusedTextColor = AppColors.TextPrimary,
+                                        unfocusedTextColor = AppColors.TextPrimary,
+                                        focusedLabelColor = AppColors.Accent,
+                                        unfocusedLabelColor = AppColors.TextSecondary
                                     )
                                 )
                                 Spacer(Modifier.width(10.dp))
@@ -387,14 +365,14 @@ fun LoginScreen(
                                     enabled = !viewModel.isLoading && viewModel.countdown == 0,
                                     shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isDark) Color(0x2838BDF8) else Color(0x202563EB),
-                                        contentColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF2563EB),
+                                        containerColor = AppColors.ActiveBg,
+                                        contentColor = AppColors.Accent,
                                         disabledContainerColor = if (isDark) Color(0x10FFFFFF) else Color(0x10000000),
                                         disabledContentColor = if (isDark) Color.White.copy(alpha = 0.4f) else Color(0xFF94A3B8)
                                     ),
                                     border = BorderStroke(
                                         1.dp,
-                                        if (isDark) Color(0x3538BDF8) else Color(0x352563EB)
+                                        AppColors.Border
                                     ),
                                     modifier = Modifier.height(56.dp)
                                 ) {
@@ -419,8 +397,8 @@ fun LoginScreen(
                                 enabled = !viewModel.isLoading,
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2563EB),
-                                    disabledContainerColor = Color(0xFF1D4ED8).copy(alpha = 0.5f)
+                                    containerColor = AppColors.Accent,
+                                    disabledContainerColor = AppColors.Accent.copy(alpha = 0.5f)
                                 ),
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                             ) {
@@ -451,6 +429,11 @@ fun LoginScreen(
                     }
                 }
             }
+            Spacer(Modifier.height(20.dp))
+            CampusCardEntryCard(onClick = onCampusCard)
+        }
+        if (onBack != null) IconButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 8.dp)) {
+            Icon(Icons.Outlined.ArrowBack, "返回")
         }
     }
 }

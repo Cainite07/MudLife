@@ -1,5 +1,6 @@
 *.iml
 .gradle
+.kotlin/
 /local.properties
 /.idea/caches
 /.idea/libraries
@@ -17,6 +18,11 @@ local.properties
 # 签名密钥与敏感信息 - 绝对不能上传！
 *.jks
 *.keystore
+*.p12
+*.pfx
+*signing.properties
+.env
+.env.*
 *.apk
 *.log
 local.properties

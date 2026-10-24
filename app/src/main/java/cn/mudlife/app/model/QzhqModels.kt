@@ -28,7 +28,7 @@ data class QzhqLoginData(
  * 后勤使用码实体
  */
 data class QzhqUseCodeData(
-    /** 8 位完整洗澡码，例如 88888888 */
+    /** Some deployments return three suffix digits; accept eight only when supplied in full. */
     @SerializedName("randomCode") val randomCode: String? = null,
     /** 状态：1 = 已开启，0 = 已关闭 */
     @SerializedName("useCodeStatus") val useCodeStatus: Int = 0

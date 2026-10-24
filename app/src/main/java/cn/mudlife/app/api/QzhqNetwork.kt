@@ -7,6 +7,8 @@ import cn.mudlife.app.model.QzhqResponse
 import cn.mudlife.app.model.QzhqUseCodeData
 import cn.mudlife.app.utils.MD5Utils
 import cn.mudlife.app.utils.PrefsHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
@@ -77,8 +79,8 @@ object QzhqNetwork {
         }
     }
 
-    private fun <T> parse(json: String, dataClass: Class<T>? = null): QzhqResponse<T> {
-        return try {
+    private suspend fun <T> parse(json: String, dataClass: Class<T>? = null): QzhqResponse<T> = withContext(Dispatchers.Default) {
+        try {
             val obj = JsonParser.parseString(json).asJsonObject
             val errorCode = obj.get("errorCode")?.let { if (it.isJsonNull) -1 else it.asInt } ?: -1
             val message = obj.get("message")?.let { if (it.isJsonNull) "" else it.asString } ?: ""
@@ -92,8 +94,8 @@ object QzhqNetwork {
         }
     }
 
-    private fun <T> parseList(json: String, itemClass: Class<T>): QzhqResponse<List<T>> {
-        return try {
+    private suspend fun <T> parseList(json: String, itemClass: Class<T>): QzhqResponse<List<T>> = withContext(Dispatchers.Default) {
+        try {
             val obj = JsonParser.parseString(json).asJsonObject
             val errorCode = obj.get("errorCode")?.let { if (it.isJsonNull) -1 else it.asInt } ?: -1
             val message = obj.get("message")?.let { if (it.isJsonNull) "" else it.asString } ?: ""
@@ -196,6 +198,9 @@ object QzhqNetwork {
         val resp = parse(json, QzhqUseCodeData::class.java)
         if (resp.isSuccess && resp.data != null) {
             resp.data.randomCode?.let { PrefsHelper.qzhqRandomCode = it }
+            resp.data.randomCode?.takeIf { it.matches(Regex("[0-9]{8}")) }?.let {
+                PrefsHelper.qzhqCustomCode = it.take(5)
+            }
             PrefsHelper.qzhqStatus = resp.data.useCodeStatus
         }
         return resp

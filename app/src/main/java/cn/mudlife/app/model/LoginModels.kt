@@ -47,7 +47,8 @@ data class BillItem(
     val laundryBillDTO: BillDTO? = null,
     val refundBillDTO: BillDTO? = null,
     val monthCardBillDTO: BillDTO? = null,
-    val sortTimestamp: Long? = null
+    val sortTimestamp: Long? = null,
+    val source: String = "qzxy"
 ) {
     /**
      * 统一获取实际有效的账单对象：

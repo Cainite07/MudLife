@@ -1,4 +1,7 @@
 import java.util.Properties
+import java.io.File
+import java.security.KeyStore
+import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.android.application)
@@ -14,8 +17,8 @@ android {
         applicationId = "cn.mudlife.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.3.16"
+        versionCode = 34
+        versionName = "1.4.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -25,18 +28,19 @@ android {
 
     signingConfigs {
         create("release") {
-            val propFile = rootProject.file("local.properties")
+            // Permanent release credentials live outside the checkout and build outputs.
+            val propFile = File(System.getProperty("user.home"), ".android/mudlife-signing.properties")
             val props = Properties()
             if (propFile.exists()) {
-                propFile.inputStream().use { props.load(it) }
+                propFile.reader(Charsets.UTF_8).use { props.load(it) }
             }
-            val ksPath = props.getProperty("KEYSTORE_FILE", "../mudlife.jks")
-            val ks = file(ksPath)
-            if (ks.exists()) {
+            val ksPath = System.getenv("MUDLIFE_KEYSTORE_FILE") ?: props.getProperty("KEYSTORE_FILE")
+            val ks = ksPath?.let { file(it) }
+            if (ks != null && ks.isFile) {
                 storeFile = ks
-                storePassword = props.getProperty("KEYSTORE_PASSWORD", "123456")
-                keyAlias = props.getProperty("KEY_ALIAS", "mudlife")
-                keyPassword = props.getProperty("KEY_PASSWORD", "123456")
+                storePassword = System.getenv("MUDLIFE_KEYSTORE_PASSWORD") ?: props.getProperty("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("MUDLIFE_KEY_ALIAS") ?: props.getProperty("KEY_ALIAS")
+                keyPassword = System.getenv("MUDLIFE_KEY_PASSWORD") ?: props.getProperty("KEY_PASSWORD")
             }
             enableV1Signing = true
             enableV2Signing = true
@@ -45,6 +49,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".refresh"
+            versionNameSuffix = "-refresh-preview"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -65,6 +73,26 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+// Never silently generate or substitute a release key.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    doFirst {
+        val signing = android.signingConfigs.getByName("release")
+        check(signing.storeFile?.isFile == true && !signing.storePassword.isNullOrBlank() &&
+            !signing.keyAlias.isNullOrBlank() && !signing.keyPassword.isNullOrBlank()) {
+            "MudLife release signing is missing. Restore the permanent keystore and credentials; do not generate a replacement."
+        }
+        val keyStore = KeyStore.getInstance("PKCS12")
+        signing.storeFile!!.inputStream().use { keyStore.load(it, signing.storePassword!!.toCharArray()) }
+        check(keyStore.isKeyEntry(signing.keyAlias)) { "The release private key is missing." }
+        val fingerprint = MessageDigest.getInstance("SHA-256")
+            .digest(keyStore.getCertificate(signing.keyAlias).encoded)
+            .joinToString("") { "%02x".format(it) }
+        check(fingerprint == rootProject.file("signing/release-certificate.sha256").readText().trim()) {
+            "Wrong release signing identity. Restore the fixed MudLife key; do not rotate it."
+        }
     }
 }
 
@@ -91,6 +119,8 @@ dependencies {
     implementation(libs.mqtt.paho)
     implementation(libs.mqtt.android)
     implementation(libs.security.crypto)
+
+    implementation("com.google.zxing:core:3.5.3")
 
     // 扫码
     implementation(libs.camera.core)

@@ -52,7 +52,7 @@
 -keepclasseswithmembers class * { @com.google.gson.annotations.SerializedName <fields>; }
 
 # ── Keep entire app package (Gson generics break under R8) ──
--keep class cn.mudlife.app.** { *; }
+-keep,allowoptimization class cn.mudlife.app.** { *; }
 
 # ── Kotlin Metadata (required for suspend function return types) ──
 -keep class kotlin.Metadata { *; }
@@ -74,7 +74,7 @@
 
 # ── Compose ──
 -dontwarn androidx.compose.**
--keep class androidx.compose.** { *; }
+# Compose supplies its own consumer rules; do not keep its entire implementation.
 
 # ── CameraX ──
 -keep class androidx.camera.** { *; }

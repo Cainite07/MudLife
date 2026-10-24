@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.Settings
 
 /**
  * 旗舰级 X 轴线性马达高精度触感引擎
@@ -14,6 +15,7 @@ object HapticHelper {
 
     private fun getVibrator(context: Context): Vibrator? {
         return try {
+            if (!PrefsHelper.touchFeedback || Settings.System.getInt(context.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) == 0) return null
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vm?.defaultVibrator
@@ -30,21 +32,7 @@ object HapticHelper {
      * 机械咔哒（Click）
      * 适用：右上角明暗光影切换、扫码出水卡片点击、Switch 开关变动
      */
-    fun click(context: Context) {
-        try {
-            val vibrator = getVibrator(context) ?: return
-            if (!vibrator.hasVibrator()) return
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(16L, 180))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(16L)
-            }
-        } catch (_: Exception) {}
-    }
+    fun click(context: Context) = tick(context)
 
     /**
      * 灵动微滴（Tick）

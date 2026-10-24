@@ -12,6 +12,14 @@ object PrefsHelper {
     private lateinit var prefs: SharedPreferences
     private val gson = Gson()
 
+    var touchFeedback: Boolean
+        get() = prefs.getBoolean("touchFeedback", true)
+        set(value) = prefs.edit().putBoolean("touchFeedback", value).apply()
+
+    var accountGuideSeen: Boolean
+        get() = prefs.getBoolean("accountGuideSeen", false)
+        set(value) = prefs.edit().putBoolean("accountGuideSeen", value).apply()
+
     fun init(context: Context) {
         val masterKey = try {
             MasterKey.Builder(context)
@@ -91,13 +99,44 @@ object PrefsHelper {
     var qzhqPhone: String get() = prefs.getString("qzhqPhone", "") ?: ""; set(v) = prefs.edit().putString("qzhqPhone", v).apply()
     var qzhqProjectId: String get() = prefs.getString("qzhqProjectId", "43") ?: "43"; set(v) = prefs.edit().putString("qzhqProjectId", v).apply()
     var qzhqRandomCode: String get() = prefs.getString("qzhqRandomCode", "") ?: ""; set(v) = prefs.edit().putString("qzhqRandomCode", v).apply()
-    var qzhqCustomCode: String get() = prefs.getString("qzhqCustomCode", "") ?: ""; set(v) = prefs.edit().putString("qzhqCustomCode", v).apply()
+    var qzhqCustomCode: String
+        get() {
+            val key = bathPrefixKey() ?: return ""
+            if (!prefs.contains(key)) {
+                val legacy = prefs.getString("qzhqCustomCode", "").orEmpty()
+                if (cn.mudlife.app.model.BathCode.isPrefix(legacy)) {
+                    // Bind a legacy value to the current account exactly once.
+                    prefs.edit().putString(key, legacy).remove("qzhqCustomCode").commit()
+                }
+            }
+            return prefs.getString(key, "").orEmpty()
+        }
+        set(value) {
+            require(cn.mudlife.app.model.BathCode.isPrefix(value))
+            val key = bathPrefixKey() ?: return
+            // A completed save survives an immediate process kill.
+            prefs.edit().putString(key, value).commit()
+        }
+
+    private fun bathPrefixKey(): String? = cn.mudlife.app.model.BathCode.storageKey(
+        qzhqPhone.ifEmpty { telephone }, qzhqProjectId
+    )
     var qzhqStatus: Int get() = prefs.getInt("qzhqStatus", 1); set(v) = prefs.edit().putInt("qzhqStatus", v).apply()
     val isQzhqLoggedIn: Boolean get() = qzhqLoginCode.isNotEmpty()
 
     fun saveAuth(lc: String, uid: String, aid: String, pid: String, phone: String, name: String?, sno: String? = null) {
+        if (telephone.isNotBlank() && telephone != phone) clearLifeAccount()
         loginCode = lc; userId = uid; accountId = aid; projectId = pid; telephone = phone; userName = name ?: ""
         if (!sno.isNullOrEmpty()) studentNo = sno
+    }
+    /** The merged app has independent school, logistics and device-wallet logins. */
+    fun clearLifeAccount() {
+        val edit = prefs.edit()
+        listOf("loginCode", "userId", "accountId", "projectId", "telephone", "userName", "studentNo", "schoolName",
+            "lastDeviceName", "lastDeviceMac", "lastDeviceSnCode", "lastDeviceEmoji", "boundRoom", "recentDevices",
+            "activeOrders", "projectAccounts", "useCode", "useCodeStatus", "useCodeLastConfirmedAt").forEach { edit.remove(it) }
+        prefs.all.keys.filter { it.startsWith("startedAt_") || it.startsWith("autoDiscon_") }.forEach { edit.remove(it) }
+        edit.apply()
     }
     fun clear() {
         val editor = prefs.edit()
@@ -227,7 +266,7 @@ object PrefsHelper {
     }
 
     fun saveActiveOrders(orders: List<ActiveOrder>) {
-        prefs.edit().putString("activeOrders", gson.toJson(orders)).apply()
+        prefs.edit().putString("activeOrders", gson.toJson(orders)).commit()
     }
 
     fun clearActiveOrders() = prefs.edit().remove("activeOrders").apply()

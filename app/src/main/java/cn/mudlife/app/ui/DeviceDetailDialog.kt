@@ -33,8 +33,12 @@ fun DeviceDetailDialog(
         containerColor = AppColors.SolidSurface,
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text("$emoji $type", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text(location, fontSize = 15.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(deviceSymbol(emoji), null, tint = AppColors.Accent, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(type, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
+                Text(location, fontSize = 15.sp, color = AppColors.TextSecondary, fontWeight = FontWeight.Medium)
             }
         },
         text = {

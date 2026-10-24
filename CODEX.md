@@ -57,7 +57,7 @@ GPT 在制定方案、检查逻辑时，**绝不可违背以下底层硬事实**
 
 ## 三、 工程结构与文件地图
 
-* **项目物理根目录**：`C:\Users\炎小黄\.gemini\antigravity\scratch\MudLife`
+* **当前维护根目录**：`%USERPROFILE%\Documents\Codex\2026-10-07\new-chat-5\outputs\MudLife-refresh`
 * **包名**：`cn.mudlife.app`
 * **技术栈**：Kotlin + Jetpack Compose + Material 3 + Liquid Glassmorphism
 
@@ -98,10 +98,10 @@ Gemini 执行构建或 GPT 编写执行指令时，必须使用以下固化路�
 
 | 组件/工具 | 本地固定绝对路径 / 命令 | 作用 |
 |---|---|---|
-| **ADB 锚点** | `C:\工具\platform-tools\adb.exe` | Android 调试桥，严禁全盘检索 |
-| **无线自连脚本** | `python "C:\工具\platform-tools\adb_auto_connect.py"` | 自动捕获局域网 Android 动态端口建连 |
+| **ADB 锚点** | `C:\工具\adb\adb.exe` | 多设备时核对并显式指定目标 |
+| **无线自连脚本** | `python "C:\工具\adb\adb_auto_connect.py"` | 优先 doctor / list 核对设备后连接 |
 | **Android SDK** | `C:\Android\Sdk` | SDK 根目录 |
-| **永久专属签名** | `C:\Users\炎小黄\.gemini\antigravity\scratch\MudLife\mudlife.jks`<br>别名：`mudlife`，密码：`123456` | 永久统一证书，严禁改动，确保真机可无缝覆盖更新 |
+| **永久专属签名（2026-10-15 换签）** | `%USERPROFILE%\.android\mudlife-signing\mudlife-release-2026.p12`；凭据：`%USERPROFILE%\.android\mudlife-signing.properties` | 用户确认旧私钥无法找回并授权换签；新系列固定使用此密钥，禁止自动重建，缺失必须停止发布。与旧签名 1.3.17 不兼容。 |
 | **一键编译覆装** | 项目根目录下 `deploy.bat` | 自动增量编译 Release APK + ADB 连接 + 覆盖安装 |
 | **手工构建命令** | `.\gradlew.bat assembleRelease` | 编译标准 Release 产物 |
 
@@ -116,3 +116,32 @@ Gemini 执行构建或 GPT 编写执行指令时，必须使用以下固化路�
 3. **精准代码变更（Diff / 关键逻辑块）**：给出改动前后的逻辑与关键代码，不含糊推测。
 4. **边界与副作用防范**：评估是否会破坏持久化缓存、签名机制或现有 MQTT 推送。
 5. **验证闭环步骤**：说明 Gemini 在实机上应观察什么现象以确认问题解决。
+
+## 2026-10-15 当前维护状态
+
+- 用户授权 Codex 直接实施与打包；采用温暖纸张风格，保持原有页面顺序和功能布局。
+- 维护目录为当前仓库，源码基线 74358d1 (1.3.16)，对照旧 1.3.17 APK 的相关逻辑修复；不宣称完整恢复 1.3.17 源码。
+- 新签名系列首版 1.3.18 / versionCode 26，正式包 cn.mudlife.app；debug 仍使用独立 .refresh 包名。
+- 用户要求少量必要检查，电脑或手机界面控制前先告知；本轮明确授权无线调试卸载旧版与修复预览，保留 cn.mudlife.app.cardtest，再安装新版。
+- CI 仅允许从 Secrets 恢复固定密钥；不得临时生成密钥。密钥及凭据不得进仓库。
+
+## 2026-10-24 当前迭代约定（1.4.4 / 33）
+
+- 后续仅在正式包 `cn.mudlife.app`、现有固定签名上覆盖迭代；用户已授权卸载早期 `cn.mudlife.app.cardtest`、独立 `cn.mudlife.campuscard` 和 `cn.mudlife.washlab`。不再保留测试版安装，也不继续洗衣机接入。不要卸载正式包或清除其数据。
+- 账单页仅使用学校校园卡流水，余额及充值入口在账单顶部。保留月份与加密缓存，按饮食、洗澡、充值、其他分类；只统计支出，不混入趣智钱包记录。
+- 首页使用码入口同时显示洗浴与吹风机码；学校、趣智校园、趣智热水后勤保持独立账号，首次未登录用户有可跳过引导。
+- 用户已选定 A“校园之门”图标。原稿和备选在 `assets/icon-concepts/`，透明前景为 `assets/mudlife-icon-foreground.png`；自适应前景及单色层已按各密度导出。不要回到被否定的 M 字母方案。
+- 更新检查增加 Fastly/Gcore 节点，安装权限及失败提示已补齐。公开 version.json 仍为 1.3.16 / 24；直连元数据节点已响应，现有 APK 镜像的本机直连下载速度很低，完整下载未通过。未发布远端新版，不能宣称所有用户的直连更新已解决；稳定分发仍需落实可靠下载源及公开发布。
+- 本轮 54 项单元测试通过；Release 构建及固定证书 v2/v3 验证通过。手机只读安装状态已核对为正式包 1.4.4 / 33，首次安装时间保持 2026-10-15；账号实际登录状态、付款与新布局的真机交互仍由用户手动检查。
+- 本机 Gradle 存在中文路径测试启动问题，可临时将用户目录映射到 M:，以 M: 路径与 `GRADLE_USER_HOME=M:\.gradle` 构建；完成后移除映射。不要为路径问题修改业务逻辑或重新生成密钥。
+
+- 最终交付 APK：上级 outputs/MudLife-1.4.4.apk（已含选定图标）；SHA-256：D2F55A9482D7AF0CFE7C81711AA0038B6C33F0AB7B3F58CB720A64D17314B751。图标适配后的 Release 已重新构建并在同一正式包上覆盖安装成功。
+
+## 2026-10-24 双平台发行约定（1.4.5 / 34）
+
+- 用户指定 Gitee 仓库为 `cainite/MudLife`，授权以后正式迭代同时发布到 GitHub 与 Gitee；两个平台必须使用同一源码提交、标签、APK 与校验文件。详见 `docs/RELEASING.md` 和 `scripts/publish_release.py`。
+- Gitee 私人令牌仅存于 Windows Git Credential Manager，禁止回显或写入仓库。
+- 本轮已验证 Gitee 旧版 APK 可以匿名直连完整下载；1.4.5 将 Gitee raw 清单加入检查来源，并将清单中的 Gitee 镜像置于下载首位。新版本远端发布情况以发行页与脚本校验结果为准。
+- README 已更新为融合后的功能；`assets/promo/` 是虚构数据的界面示意，二维码、使用码均隐藏，不使用用户真实账户截图。
+
+- 1.4.5 本地验证：55 项单元测试全部通过，Release 构建通过，证书 v2/v3 校验匹配固定身份。用户当前明确要求不要操作手机，本轮不连接、不升级手机。宣传图使用圆润奶油白分层边框，无底部手势线，页脚简化为“演示数据”。
