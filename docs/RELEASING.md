@@ -30,3 +30,5 @@
 ## GitHub Actions
 
 push 和 pull request 自动运行单元测试。只有手动启用 `build_release` 才从 Secrets 恢复既有固定签名并生成发行包；缺少 Secrets 时发行构建失败，不创建替代密钥。两端发布由上述本机脚本完成，无需把 Gitee 令牌复制到源码或 GitHub Secrets。
+
+个人构建代理应写在本机 `~/.gradle/gradle.properties`，不得把 `127.0.0.1` 等仅本机可用的代理地址写入项目的公共配置，否则 GitHub runner 无法下载 Gradle。发行源码以对应版本标签为准；发行后仅修复构建配置时，无需替换已经校验的 APK 或移动已发布标签。
