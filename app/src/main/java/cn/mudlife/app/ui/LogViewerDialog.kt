@@ -216,7 +216,7 @@ fun LogViewerDialog(onDismiss: () -> Unit) {
                             onClick = {
                                 try {
                                     val shareIntent = AppLogger.createShareIntent(context)
-                                    val chooser = Intent.createChooser(shareIntent, "分享泥浆生活诊断日志")
+                                    val chooser = Intent.createChooser(shareIntent, "分享江大生活诊断日志")
                                     chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                     context.startActivity(chooser)
                                 } catch (e: Exception) {

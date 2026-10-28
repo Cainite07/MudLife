@@ -196,13 +196,6 @@ object QzhqNetwork {
         val projectId = PrefsHelper.qzhqProjectId
         val json = apiService.getUseCode(phone = phone, projectId = projectId, loginCode = loginCode).awaitString()
         val resp = parse(json, QzhqUseCodeData::class.java)
-        if (resp.isSuccess && resp.data != null) {
-            resp.data.randomCode?.let { PrefsHelper.qzhqRandomCode = it }
-            resp.data.randomCode?.takeIf { it.matches(Regex("[0-9]{8}")) }?.let {
-                PrefsHelper.qzhqCustomCode = it.take(5)
-            }
-            PrefsHelper.qzhqStatus = resp.data.useCodeStatus
-        }
         return resp
     }
 
@@ -210,9 +203,6 @@ object QzhqNetwork {
         val projectId = PrefsHelper.qzhqProjectId
         val json = apiService.updateUseCodeStatus(status = status, phone = phone, projectId = projectId, loginCode = loginCode).awaitString()
         val resp = parse(json, Unit::class.java)
-        if (resp.isSuccess) {
-            PrefsHelper.qzhqStatus = status
-        }
         return resp
     }
 

@@ -1,11 +1,11 @@
 {
-  "versionCode": 35,
-  "versionName": "1.4.6",
-  "releaseDate": "2026-10-25",
-  "title": "MudLife v1.4.6",
-  "changelog": "· 修复切页透明闪烁与矩形扩散反馈，统一不透明页面背景。\n· 外观提供跟随系统、浅色和深色，保存选择；深浅切换采用整幅画面同步的圆形展开与收回。\n· 移除全部页面的截屏、录屏限制。\n· 校园卡充值选项及按钮改为纸色和鼠尾草绿，补全深浅主题配色。\n· Gitee 与 GitHub 并行选源，复用先收到有效数据的连接，失败回退备用源。\n· 下载显示实际传输量、速度和来源，分别提示连接、下载和验证阶段。\n· 沿用固定签名，保留既有账号与保存的数据。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.4.6/MudLife-1.4.6.apk",
+  "versionCode": 36,
+  "versionName": "1.4.7",
+  "releaseDate": "2026-10-28",
+  "title": "江大生活 · Jiangda Life v1.4.7",
+  "changelog": "· 本版起软件名称改为“江大生活 / Jiangda Life”，仓库与更新地址沿用原有配置。\n· 使用码、钱包和项目账号同步增加会话校验，退出或换号后取消旧任务，防止迟到响应写回。\n· 首页刷新与后勤登录不再加载无展示入口的旧账单，保留设备所需的项目账号同步。\n· 下拉刷新跟随实际任务完成，避免固定一秒结束和重复刷新。\n· 更新检查收到有效版本后短暂收集其他结果并取消慢节点，继续选取较高版本。\n· 移除已替代的旧账单页面，保留全部扫码库、离线模型及设备架构支持；固定签名不变。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.4.7/MudLife-1.4.7.apk",
   "mirrors": [
-    "https://gitee.com/cainite/MudLife/releases/download/v1.4.6/MudLife-1.4.6.apk"
+    "https://gitee.com/cainite/MudLife/releases/download/v1.4.7/MudLife-1.4.7.apk"
   ]
 }

@@ -4,7 +4,7 @@
 
 <h1 align="center">泥浆生活 · MudLife</h1>
 <p align="center"><b>校园日常，放在一起。</b><br>江苏大学一卡通 · 趣智校园 · 趣智热水后勤</p>
-<p align="center">v1.4.6 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
+<p align="center">v1.4.7 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
 
 <p align="center">
   <a href="https://gitee.com/cainite/MudLife/releases"><b>Gitee 国内下载</b></a> &emsp;

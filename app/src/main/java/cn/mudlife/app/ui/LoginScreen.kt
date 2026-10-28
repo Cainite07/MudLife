@@ -93,11 +93,11 @@ fun LoginScreen(
                         .clip(RoundedCornerShape(22.dp))
                         .background(Color(0xFFF1E6C9))
                 )
-                Image(painterResource(R.mipmap.ic_launcher_foreground), "泥浆生活", modifier = Modifier.size(72.dp))
+                Image(painterResource(R.mipmap.ic_launcher_foreground), "江大生活", modifier = Modifier.size(72.dp))
             }
 
             Text(
-                "泥浆生活",
+                "江大生活",
                 fontFamily = FontFamily.Serif,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,

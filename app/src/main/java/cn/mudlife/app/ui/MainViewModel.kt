@@ -23,8 +23,6 @@ import cn.mudlife.app.api.getWalletSafe
 import cn.mudlife.app.api.queryUsingSafe
 import cn.mudlife.app.model.ActiveOrder
 import cn.mudlife.app.model.UseCodeData
-import cn.mudlife.app.model.BillItem
-import cn.mudlife.app.model.BillDTO
 import cn.mudlife.app.model.DeviceInfo
 import cn.mudlife.app.model.MqttOrderMsg
 import cn.mudlife.app.model.WalletData
@@ -33,14 +31,12 @@ import cn.mudlife.app.utils.PrefsHelper
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.joinAll
+import cn.mudlife.app.utils.AccountRequests
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlin.math.abs
 
 class MainViewModel(
@@ -93,6 +89,12 @@ class MainViewModel(
     private var managersInitialized = false
     private var orderVerificationJob: Job? = null
     private var accountGeneration = 0L
+    private val lifeRequests = AccountRequests(viewModelScope) { listOf(PrefsHelper.loginCode, PrefsHelper.userId) }
+    private val bathRequests = AccountRequests(viewModelScope) { listOf(PrefsHelper.qzhqLoginCode, PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }) }
+    private var bathLoginJob: Job? = null
+    private var refreshJob: Job? = null
+    private var refreshGeneration = 0L
+    var isRefreshing by mutableStateOf(false); private set
     private var activeDeviceSnCodes = mutableSetOf<String>()
     private val gson = Gson()
     private var mqttManager: MqttManager? = null
@@ -100,10 +102,6 @@ class MainViewModel(
     private var orderPollJob: Job? = null
     private var probeJob: Job? = null
 
-    var billList by mutableStateOf<List<BillItem>>(emptyList())
-    var isLoadingBills by mutableStateOf(false)
-    var billsLoaded by mutableStateOf(false); private set
-    var billLoadError by mutableStateOf<String?>(null); private set
     var useCodeData by mutableStateOf<UseCodeData?>(
         if (PrefsHelper.useCode.isNotEmpty()) {
             UseCodeData(
@@ -112,11 +110,6 @@ class MainViewModel(
             )
         } else null
     )
-    var campusCardBalance by mutableStateOf(
-        if ((PrefsHelper.campusCardBalance.toDoubleOrNull() ?: 0.0) > 0.0) PrefsHelper.campusCardBalance else ""
-    )
-    var campusCardBalanceTime by mutableStateOf(PrefsHelper.campusCardBalanceTime)
-
     // ── 吹风机使用码 20 次抽选架构 ──
     var candidateUseCode by mutableStateOf("")
     var remainUseCodeTimes by mutableStateOf(20)
@@ -156,6 +149,7 @@ class MainViewModel(
     fun initManagers(context: Context) {
         if (managersInitialized) return
         managersInitialized = true
+        syncProjectAccounts()
         if (mqttManager == null) mqttManager = MqttManager(context, { handleMqttMessage(it) })
 
         lastDeviceName = PrefsHelper.lastDeviceName
@@ -283,9 +277,12 @@ class MainViewModel(
     }
 
     private suspend fun refreshDeviceStatus(snCode: String, overrideProjectId: String? = null) {
+        val owner = PrefsHelper.loginCode
+        val generation = accountGeneration
         try {
             val pid = overrideProjectId ?: selectedDevice?.projectId?.toString()?.takeIf { it.isNotBlank() && it != "0" && it != "null" }
             val q = NetworkModule.apiService.queryUsingSafe(snCode = snCode, auth = NetworkModule.authFields(overrideProjectId = pid))
+            if (owner != PrefsHelper.loginCode || generation != accountGeneration) return
             if (q.errorCode == 307 || (q.success && q.data?.orderNo != null)) {
                 activeDeviceSnCodes.add(snCode)
                 isOwner = q.data?.isOwner ?: true
@@ -831,12 +828,10 @@ class MainViewModel(
 
     fun logout() {
         accountGeneration++
-        billLoadJob?.cancel()
-        billLoadJob = null
-        lastBillsLoadedAt = 0L
-        isLoadingBills = false
-        billsLoaded = false
-        billLoadError = null
+        lifeRequests.invalidate()
+        refreshGeneration++; refreshJob?.cancel(); isRefreshing = false
+        probeJob?.cancel()
+        candidateUseCode = ""; showDryerCodeModal = false; isRollingUseCode = false; remainUseCodeTimes = 20
         orderVerificationJob?.cancel()
         isVerifyingOrders = false
         managersInitialized = false
@@ -866,7 +861,6 @@ class MainViewModel(
         recentDevices = emptyList()
         activeOrders.clear()
         activeDeviceSnCodes.clear()
-        billList = emptyList()
         useCodeData = null
         walletInfo = null
     }
@@ -902,7 +896,7 @@ class MainViewModel(
         if (isRealKick) {
             cn.mudlife.app.utils.AppLogger.e("Auth", "触发账号强制下线: $msg")
             kickedOut = true
-            PrefsHelper.clear()
+            PrefsHelper.clearLifeAccount()
         }
     }
     private fun checkKickEx(e: Exception) {
@@ -910,16 +904,23 @@ class MainViewModel(
         if (m.contains("401") || m.contains("403") || m.contains("Unauthorized") || m.contains("Forbidden")) {
             cn.mudlife.app.utils.AppLogger.e("Auth", "触发网络鉴权失效下线: $m")
             kickedOut = true
-            PrefsHelper.clear()
+            PrefsHelper.clearLifeAccount()
         }
     }
 
-    fun refreshWallet() {
-        viewModelScope.launch {
+    fun lifeAccountAuthenticated() {
+        lifeRequests.invalidate()
+        walletInfo = null; useCodeData = null
+        candidateUseCode = ""; showDryerCodeModal = false; isRollingUseCode = false
+        refreshWallet(); loadUseCode()
+    }
+
+    fun refreshWallet(): Job {
+        return lifeRequests.launch {
             try {
-                val resp = NetworkModule.apiService.getWalletSafe()
+                val resp = request { NetworkModule.apiService.getWalletSafe() }
                 if (resp.success) walletInfo = resp.data else checkKick(resp.displayMessage)
-            } catch (e: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) {
                 checkKickEx(e)
                 val msg = e.message ?: ""
                 if (msg.contains("Unable to resolve host", ignoreCase = true) ||
@@ -932,10 +933,10 @@ class MainViewModel(
         }
     }
 
-    fun loadUseCode() {
-        viewModelScope.launch {
+    fun loadUseCode(): Job {
+        return lifeRequests.launch {
             try {
-                val resp = NetworkModule.apiService.getUseCodeSafe()
+                val resp = request { NetworkModule.apiService.getUseCodeSafe() }
                 if (resp.success && resp.data != null) {
                     val remoteCode = resp.data.useCode
                     // 服务端是使用码的唯一真实来源。旧版本曾用本地保护标记
@@ -953,15 +954,15 @@ class MainViewModel(
                         remainUseCodeTimes = resp.data.remainTimes
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {}
         }
     }
 
     fun toggleUseCodeStatus(enabled: Boolean) {
-        viewModelScope.launch {
+        lifeRequests.launch {
             try {
                 val newStatus = if (enabled) 1 else 0
-                val resp = NetworkModule.apiService.updateUseCodeStatusSafe(newStatus, NetworkModule.authFields())
+                val resp = request { NetworkModule.apiService.updateUseCodeStatusSafe(newStatus, NetworkModule.authFields()) }
                 if (resp.success) {
                     useCodeData = useCodeData?.copy(useCodeStatus = newStatus)
                         ?: UseCodeData(useCode = PrefsHelper.useCode, useCodeStatus = newStatus)
@@ -970,7 +971,7 @@ class MainViewModel(
                 } else {
                     toastMessage = resp.displayMessage.orEmpty().ifEmpty { "操作失败" }
                 }
-            } catch (_: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {
                 toastMessage = "网络请求失败，请检查网络"
             }
         }
@@ -998,10 +999,10 @@ class MainViewModel(
             toastMessage = "今日抽选机会已用尽"
             return
         }
-        viewModelScope.launch {
+        lifeRequests.launch {
             isRollingUseCode = true
             try {
-                val resp = NetworkModule.apiService.generateUseCodeSafe(NetworkModule.authFields())
+                val resp = request { NetworkModule.apiService.generateUseCodeSafe(NetworkModule.authFields()) }
                 if (resp.success && resp.data != null) {
                     if (resp.data.useCode.isNotEmpty()) {
                         candidateUseCode = resp.data.useCode
@@ -1014,31 +1015,31 @@ class MainViewModel(
                 } else {
                     toastMessage = resp.displayMessage.orEmpty().ifEmpty { "抽选新码失败" }
                 }
-            } catch (_: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {
                 toastMessage = "网络请求失败，请检查网络"
             } finally {
-                isRollingUseCode = false
+                if (isCurrent) isRollingUseCode = false
             }
         }
     }
 
     fun confirmUseCandidateCode() {
         val codeToUse = candidateUseCode.trim().ifEmpty { return }
-        viewModelScope.launch {
+        lifeRequests.launch {
             try {
                 // generate 只生成候选码；必须调用 set 才会把候选码写入当前账户。
                 val auth = NetworkModule.authFields()
-                val setResp = NetworkModule.apiService.setUseCodeSafe(
+                val setResp = request { NetworkModule.apiService.setUseCodeSafe(
                     useCode = codeToUse,
                     auth = auth
-                )
+                ) }
                 if (!setResp.success) {
                     toastMessage = setResp.displayMessage.orEmpty().ifEmpty { "设置新码失败" }
                     return@launch
                 }
 
                 // “确认使用”同时保证使用码处于开启状态。
-                val statusResp = NetworkModule.apiService.updateUseCodeStatusSafe(1, auth)
+                val statusResp = request { NetworkModule.apiService.updateUseCodeStatusSafe(1, auth) }
                 if (!statusResp.success) {
                     toastMessage = statusResp.displayMessage.orEmpty().ifEmpty { "新码已设置，但启用失败" }
                     return@launch
@@ -1047,7 +1048,7 @@ class MainViewModel(
                 // 回读服务端，只有当前生效码与候选码一致时才更新本地界面。
                 var confirmedData: UseCodeData? = null
                 for (attempt in 0 until 3) {
-                    val latestResp = NetworkModule.apiService.getUseCodeSafe()
+                    val latestResp = request { NetworkModule.apiService.getUseCodeSafe() }
                     if (latestResp.success && latestResp.data?.useCode == codeToUse) {
                         confirmedData = latestResp.data
                         break
@@ -1075,7 +1076,7 @@ class MainViewModel(
                 showDryerCodeModal = false
                 candidateUseCode = ""
                 toastMessage = "已成功更换并激活吹风机码"
-            } catch (_: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {
                 toastMessage = "激活新码网络异常，请检查网络"
             }
         }
@@ -1150,42 +1151,37 @@ class MainViewModel(
 
     // ── 后勤洗浴使用码控制 (江大专区) ──
     fun logoutQzhq() {
+        bathRequests.invalidate(); bathLoginJob?.cancel(); qzhqLoading = false
         PrefsHelper.qzhqLoginCode = ""
         PrefsHelper.qzhqRandomCode = ""
         isQzhqLoggedIn = false
         qzhqUseCodeData = null
         qzhqPrefix = ""
-        billLoadJob?.cancel()
-        billLoadJob = null
-        isLoadingBills = false
-        lastBillsLoadedAt = 0L
-        billsLoaded = false
-        billLoadError = null
-        billList = billList.filterNot { it.source == "qzhq" }
     }
 
-    fun loadQzhqUseCode() {
+    fun loadQzhqUseCode(): Job {
         qzhqPrefix = PrefsHelper.qzhqCustomCode
         val phone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }
         val loginCode = PrefsHelper.qzhqLoginCode
-        if (phone.isEmpty() || loginCode.isEmpty()) return
 
-        viewModelScope.launch {
+        return bathRequests.launch {
             qzhqLoading = true
             try {
-                val resp = cn.mudlife.app.api.QzhqNetwork.getUseCode(phone, loginCode)
+                val resp = request { cn.mudlife.app.api.QzhqNetwork.getUseCode(phone, loginCode) }
                 if (PrefsHelper.qzhqLoginCode != loginCode) return@launch
                 if (resp.isSuccess && resp.data != null) {
+                    saveBathCode(resp.data)
                     qzhqUseCodeData = resp.data
                     qzhqPrefix = PrefsHelper.qzhqCustomCode
                 } else if (resp.errorCode == 8 || resp.errorCode == 401) {
+                    qzhqLoading = false
                     isQzhqLoggedIn = false
                     PrefsHelper.qzhqLoginCode = ""
                     toastMessage = "后勤账号登录失效，请重新登录"
                 }
-            } catch (_: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {
             } finally {
-                qzhqLoading = false
+                if (isCurrent) qzhqLoading = false
             }
         }
     }
@@ -1198,17 +1194,18 @@ class MainViewModel(
             return
         }
 
-        viewModelScope.launch {
+        bathRequests.launch {
             try {
-                val resp = cn.mudlife.app.api.QzhqNetwork.updateUseCodeStatus(newStatus, phone, loginCode)
+                val resp = request { cn.mudlife.app.api.QzhqNetwork.updateUseCodeStatus(newStatus, phone, loginCode) }
                 if (resp.isSuccess) {
+                    PrefsHelper.qzhqStatus = newStatus
                     qzhqUseCodeData = qzhqUseCodeData?.copy(useCodeStatus = newStatus)
                         ?: cn.mudlife.app.model.QzhqUseCodeData(randomCode = PrefsHelper.qzhqRandomCode, useCodeStatus = newStatus)
                     toastMessage = if (newStatus == 1) "洗澡码已开启" else "洗澡码已关闭"
                 } else {
                     toastMessage = resp.message.ifEmpty { "操作失败" }
                 }
-            } catch (_: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {
                 toastMessage = "网络请求失败，请检查网络"
             }
         }
@@ -1222,13 +1219,14 @@ class MainViewModel(
             return
         }
 
-        viewModelScope.launch {
+        bathRequests.launch {
             try {
-                val resp = cn.mudlife.app.api.QzhqNetwork.setUseCode(newCode5, phone, loginCode)
+                val resp = request { cn.mudlife.app.api.QzhqNetwork.setUseCode(newCode5, phone, loginCode) }
                 if (resp.isSuccess) {
                     PrefsHelper.qzhqCustomCode = newCode5
                     qzhqPrefix = newCode5
-                    val codeResp = cn.mudlife.app.api.QzhqNetwork.getUseCode(phone, loginCode)
+                    val codeResp = request { cn.mudlife.app.api.QzhqNetwork.getUseCode(phone, loginCode) }
+                    if (codeResp.isSuccess && codeResp.data != null) saveBathCode(codeResp.data)
                     val random3 = if (codeResp.isSuccess && codeResp.data != null && !codeResp.data.randomCode.isNullOrEmpty()) {
                         codeResp.data.randomCode!!
                     } else {
@@ -1247,7 +1245,7 @@ class MainViewModel(
                     toastMessage = msg
                     onComplete(false, msg)
                 }
-            } catch (e: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) {
                 val msg = "网络连接异常，请重试"
                 toastMessage = msg
                 onComplete(false, msg)
@@ -1256,13 +1254,14 @@ class MainViewModel(
     }
 
     fun loginQzhq(phone: String, passwordRaw: String, onComplete: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
+        bathLoginJob?.cancel()
+        bathLoginJob = viewModelScope.launch {
             try {
                 val resp = cn.mudlife.app.api.QzhqNetwork.login(phone, passwordRaw)
                 if (resp.isSuccess && resp.data != null) {
+                    bathRequests.invalidate()
                     isQzhqLoggedIn = true
                     loadQzhqUseCode()
-                    loadBills()
                     toastMessage = "后勤专区登录成功，已同步洗澡码"
                     onComplete(true, "登录成功")
                 } else {
@@ -1270,7 +1269,7 @@ class MainViewModel(
                     toastMessage = msg
                     onComplete(false, msg)
                 }
-            } catch (e: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) {
                 val msg = "网络异常：${e.message ?: "连接失败"}"
                 toastMessage = msg
                 onComplete(false, msg)
@@ -1279,13 +1278,14 @@ class MainViewModel(
     }
 
     fun smsLoginQzhq(phone: String, smsCode: String, onComplete: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
+        bathLoginJob?.cancel()
+        bathLoginJob = viewModelScope.launch {
             try {
                 val resp = cn.mudlife.app.api.QzhqNetwork.smsLogin(phone, smsCode)
                 if (resp.isSuccess && resp.data != null) {
+                    bathRequests.invalidate()
                     isQzhqLoggedIn = true
                     loadQzhqUseCode()
-                    loadBills()
                     toastMessage = "后勤专区登录成功，已同步洗澡码"
                     onComplete(true, "登录成功")
                 } else {
@@ -1293,7 +1293,7 @@ class MainViewModel(
                     toastMessage = msg
                     onComplete(false, msg)
                 }
-            } catch (e: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) {
                 val msg = "网络异常：${e.message ?: "连接失败"}"
                 toastMessage = msg
                 onComplete(false, msg)
@@ -1322,187 +1322,37 @@ class MainViewModel(
     }
 
     fun pullRefresh() {
-        refreshWallet()
-        loadBills(force = true)
-        loadUseCode()
-        loadQzhqUseCode()
-        cleanInactiveOrders()
-        if (activeOrders.isNotEmpty()) {
-            activeOrders.forEach { order ->
-                viewModelScope.launch { refreshDeviceStatus(order.snCode) }
-            }
+        if (refreshJob?.isActive == true) return
+        val generation = ++refreshGeneration
+        isRefreshing = true
+        refreshJob = viewModelScope.launch {
+            try {
+                val work = mutableListOf(syncProjectAccounts(), refreshWallet(), loadUseCode(), loadQzhqUseCode())
+                cleanInactiveOrders()
+                orderVerificationJob?.let(work::add)
+                activeOrders.toList().forEach { order ->
+                    work += launch { refreshDeviceStatus(order.snCode) }
+                }
+                work.joinAll()
+            } finally { if (generation == refreshGeneration) isRefreshing = false }
         }
     }
 
+    private fun saveBathCode(data: cn.mudlife.app.model.QzhqUseCodeData) {
+        data.randomCode?.let { PrefsHelper.qzhqRandomCode = it }
+        data.randomCode?.takeIf { it.matches(Regex("[0-9]{8}")) }?.let { PrefsHelper.qzhqCustomCode = it.take(5) }
+        PrefsHelper.qzhqStatus = data.useCodeStatus
+    }
 
-
-    // ── 账单 ──
-    private var billLoadJob: Job? = null
-    private var lastBillsLoadedAt = 0L
-
-    fun loadBills(force: Boolean = false) {
-        if (billLoadJob?.isActive == true) return
-        if (!force && lastBillsLoadedAt != 0L &&
-            android.os.SystemClock.elapsedRealtime() - lastBillsLoadedAt < 60_000L) return
-        val generation = accountGeneration
-        billLoadJob = viewModelScope.launch {
-            isLoadingBills = true
-            billLoadError = null
-            val failures = java.util.concurrent.atomic.AtomicInteger(0)
-            try {
-                // 1. 获取当前用户绑定的全部项目与子账户（如直饮水 3255、洗浴吹风 4253、其他宿舍区等）
-                val userProjectsResp = try {
-                    if (PrefsHelper.isLoggedIn) NetworkModule.apiService.getUserProjectsSafe() else null
-                } catch (e: CancellationException) { throw e }
-                  catch (_: Exception) { null }
-                if (generation != accountGeneration) return@launch
-
-                if (userProjectsResp?.success == true && !userProjectsResp.data.isNullOrEmpty()) {
-                    val pMap = userProjectsResp.data.associate { it.projectId.toString() to it.accountId.toString() }
-                    NetworkModule.setProjectAccounts(pMap)
-                    PrefsHelper.saveProjectAccounts(pMap)
-                }
-
-                val targets = if (!PrefsHelper.isLoggedIn) emptyList() else if (userProjectsResp?.success == true && !userProjectsResp.data.isNullOrEmpty()) {
-                    userProjectsResp.data.map { it.projectId.toString() to it.accountId.toString() }.distinct()
-                } else {
-                    listOf(NetworkModule.currentProjectId to PrefsHelper.accountId)
-                }
-
-                val fmt = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault())
-
-                // 2. 并发拉取近 6 个月在各个项目下的云端账单 (async + awaitAll)
-                val cloudJobs = mutableListOf<kotlinx.coroutines.Deferred<List<BillItem>>>()
-                val requestSlots = Semaphore(4)
-                for (monthOffset in 0..5) {
-                    val cal = java.util.Calendar.getInstance()
-                    cal.add(java.util.Calendar.MONTH, -monthOffset)
-                    val month = fmt.format(cal.time)
-
-                    for ((pid, aid) in targets) {
-                        cloudJobs.add(async(Dispatchers.IO) {
-                            requestSlots.withPermit {
-                            try {
-                                val resp = NetworkModule.apiService.getBillListSafe(
-                                    month = month,
-                                    billRequestType = 0,
-                                    projectId = pid,
-                                    accountId = aid
-                                )
-                                if (resp.success) resp.data.orEmpty()
-                                else { failures.incrementAndGet(); emptyList() }
-                            } catch (e: CancellationException) { throw e }
-                              catch (e: Exception) {
-                                failures.incrementAndGet()
-                                cn.mudlife.app.utils.AppLogger.w("BillLoad", "查询项目 $pid ($month) 异常: ${e.message}")
-                                emptyList()
-                            }
-                            }
-                        })
-                    }
-                }
-
-                // 2.5 并发拉取江大后勤专区热水洗浴全量账单
-                val qzhqJob = async(Dispatchers.IO) {
-                    val qzhqPhone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }
-                    val qzhqLoginCode = PrefsHelper.qzhqLoginCode
-                    if (qzhqPhone.isNotEmpty() && qzhqLoginCode.isNotEmpty()) {
-                        try {
-                            val qzhqResp = cn.mudlife.app.api.QzhqNetwork.getWalletBillList(phone = qzhqPhone, loginCode = qzhqLoginCode)
-                            if (qzhqResp.isSuccess && !qzhqResp.data.isNullOrEmpty()) {
-                                cn.mudlife.app.utils.AppLogger.i("BillLoad", "成功获取后勤洗浴账单共 ${qzhqResp.data.size} 笔")
-
-                                // 同步最新校园卡余额（仅当确实存在严格大于 0 的有效结存流水时才同步，彻底拦截 -5 等状态码）
-                                val latestWithBalance = qzhqResp.data.firstOrNull { (it.afterMoney ?: 0.0) > 0.0 }
-                                latestWithBalance?.afterMoney?.let { bal ->
-                                    val balStr = String.format(java.util.Locale.US, "%.2f", bal)
-                                    withContext(Dispatchers.Main) {
-                                        if (generation == accountGeneration) {
-                                            campusCardBalance = balStr
-                                            campusCardBalanceTime = System.currentTimeMillis()
-                                            PrefsHelper.campusCardBalance = balStr
-                                            PrefsHelper.campusCardBalanceTime = campusCardBalanceTime
-                                        }
-                                    }
-                                    cn.mudlife.app.utils.AppLogger.i("BillLoad", "已同步最新洗浴结存余额: ¥$balStr")
-                                }
-
-                                qzhqResp.data.mapNotNull { qb ->
-                                    val date = qb.dealDate ?: return@mapNotNull null
-                                    val xfVal = if ((qb.xfMoney ?: 0.0) > 0.0) qb.xfMoney ?: 0.0 else (qb.upMoney ?: 0.0) + (qb.upLeadMoney ?: 0.0)
-                                    val money = String.format(java.util.Locale.US, "%.2f", xfVal)
-                                    val afterVal = qb.afterMoney
-                                    val beforeVal = qb.beforeMoney ?: if (afterVal != null && afterVal > 0.0 && xfVal > 0.0) afterVal + xfVal else null
-                                    val op = qb.opName ?: qb.consumeType ?: ""
-                                    val devTypeName = when {
-                                        op.contains("开水") || op.contains("饮水") -> "开水器"
-                                        op.contains("吹风") -> "共享吹风机"
-                                        else -> "宿舍浴室热水器"
-                                    }
-                                    val desc = qb.description ?: if (!qb.areaName.isNullOrEmpty()) "$devTypeName: ${qb.areaName}" else devTypeName
-                                    val dto = BillDTO(
-                                        orderId = qb.time ?: "${date}_${qb.accountId}",
-                                        dealDate = date,
-                                        consumeDate = date,
-                                        consumeMoney = money,
-                                        deviceTypeName = devTypeName,
-                                        description = desc,
-                                        deductTypeName = "校园卡扣费",
-                                        beforeMoney = if (beforeVal != null && beforeVal > 0.0) String.format(java.util.Locale.US, "%.2f", beforeVal) else null,
-                                        afterMoney = if (afterVal != null && afterVal > 0.0) String.format(java.util.Locale.US, "%.2f", afterVal) else null
-                                    )
-                                    BillItem(
-                                        billType = 2,
-                                        consumeBillDTO = dto,
-                                        source = "qzhq"
-                                    )
-                                }
-                            } else {
-                                if (!qzhqResp.isSuccess) failures.incrementAndGet()
-                                emptyList()
-                            }
-                        } catch (e: CancellationException) { throw e }
-                          catch (e: Exception) {
-                            failures.incrementAndGet()
-                            emptyList()
-                        }
-                    } else emptyList()
-                }
-
-                // 汇总所有并发结果
-                val all = mutableListOf<BillItem>()
-                val cloudResults = cloudJobs.awaitAll()
-                val qzhqBills = qzhqJob.await()
-                cloudResults.forEach { all.addAll(it) }
-                all.addAll(qzhqBills)
-
-                // 3. 全局去重（按订单号与消费时间组合）并按时间倒序排列
-                val sorted = withContext(Dispatchers.Default) { all.distinctBy {
-                    val dto = it.safeConsumeBillDTO
-                    "${it.source}_${dto.safeOrderId}_${dto.safeConsumeDate}_${dto.safeConsumeMoney}"
-                }.sortedByDescending { it.safeConsumeBillDTO.safeConsumeDate } }
-                if (generation != accountGeneration) return@launch
-                billList = sorted
-                billsLoaded = failures.get() == 0
-                billLoadError = if (billsLoaded) null else "部分来源未同步完成"
-                lastBillsLoadedAt = if (billsLoaded) android.os.SystemClock.elapsedRealtime() else 0
-
-                cn.mudlife.app.utils.AppLogger.i("BillLoad", "成功汇总全区全品类账单共 ${billList.size} 笔 (包含后勤洗浴 ${qzhqBills.size} 笔)")
-            } catch (e: CancellationException) { throw e }
-              catch (e: Exception) {
-                billsLoaded = false
-                billLoadError = "账单同步失败"
-                cn.mudlife.app.utils.AppLogger.e("BillLoad", "加载账单异常: ${e.message}", e)
-                checkKickEx(e)
-                val msg = e.message ?: ""
-                if (msg.contains("Unable to resolve host", ignoreCase = true) ||
-                    msg.contains("No address associated", ignoreCase = true) ||
-                    msg.contains("Network is unreachable", ignoreCase = true) ||
-                    msg.contains("Failed to connect", ignoreCase = true)) {
-                    toastMessage = "网络连接失败，请检查网络设置"
-                }
+    private fun syncProjectAccounts(): Job = lifeRequests.launch {
+        try {
+            val response = request { NetworkModule.apiService.getUserProjectsSafe() }
+            if (response.success && !response.data.isNullOrEmpty()) {
+                val accounts = response.data.associate { it.projectId.toString() to it.accountId.toString() }
+                NetworkModule.setProjectAccounts(accounts)
+                PrefsHelper.saveProjectAccounts(accounts)
             }
-            finally { if (generation == accountGeneration) isLoadingBills = false }
-        }
+        } catch (cancelled: CancellationException) { throw cancelled }
+          catch (_: Exception) { /* Keep the existing account mapping on a transient error. */ }
     }
 }

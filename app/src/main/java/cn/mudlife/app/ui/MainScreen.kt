@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
 import cn.mudlife.app.QrScanActivity
 import cn.mudlife.app.ui.theme.paperBackground
 import cn.mudlife.app.ui.theme.AppColors
@@ -62,7 +61,6 @@ import cn.mudlife.app.utils.PrefsHelper
 fun MainScreen(phone: String, viewModel: MainViewModel = viewModel(), onUseCodes: () -> Unit = {}) {
     val context = LocalContext.current
     val appContext = LocalContext.current.applicationContext
-    val scope = rememberCoroutineScope()
 
     // 扫码绑定设备
     val scanLauncher = rememberLauncherForActivityResult(
@@ -83,18 +81,10 @@ fun MainScreen(phone: String, viewModel: MainViewModel = viewModel(), onUseCodes
         viewModel.initManagers(appContext)
     }
 
-    var pullRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshing = viewModel.isRefreshing
     val pullState = rememberPullRefreshState(
         refreshing = pullRefreshing,
-        onRefresh = {
-            pullRefreshing = true
-            viewModel.pullRefresh()
-            // 1秒后隐藏顶部指示器
-            scope.launch {
-                kotlinx.coroutines.delay(1000)
-                pullRefreshing = false
-            }
-        }
+        onRefresh = viewModel::pullRefresh
     )
 
     Box(Modifier.fillMaxSize()) {
@@ -121,7 +111,7 @@ fun MainScreen(phone: String, viewModel: MainViewModel = viewModel(), onUseCodes
                     ) {
                         item {
                             Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("泥浆生活", fontFamily = FontFamily.Serif, fontSize = 27.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+                                Text("江大生活", fontFamily = FontFamily.Serif, fontSize = 27.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
                                 Text(java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M月d日 · E", java.util.Locale.CHINA)), fontSize = 11.sp, color = AppColors.TextSecondary)
                             }
                         }

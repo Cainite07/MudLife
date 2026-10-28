@@ -211,7 +211,7 @@ object AppLogger {
         val src = getLogFile(context) ?: return false
         if (!src.exists() || src.length() == 0L) return false
         val timeStr = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.CHINA).format(java.util.Date())
-        val fileName = "泥浆生活日志_$timeStr.txt"
+        val fileName = "江大生活日志_$timeStr.txt"
         return try {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 val values = android.content.ContentValues().apply {
@@ -253,8 +253,8 @@ object AppLogger {
         return Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_STREAM, contentUri)
-            putExtra(Intent.EXTRA_SUBJECT, "泥浆生活_内测诊断日志")
-            putExtra(Intent.EXTRA_TEXT, "这是来自泥浆生活 (v${BuildConfig.VERSION_NAME}) 的内测运行诊断日志文件。")
+            putExtra(Intent.EXTRA_SUBJECT, "江大生活_内测诊断日志")
+            putExtra(Intent.EXTRA_TEXT, "这是来自江大生活 (v${BuildConfig.VERSION_NAME}) 的内测运行诊断日志文件。")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }
@@ -266,7 +266,7 @@ object AppLogger {
             if (list.isNotEmpty()) list else logList.takeLast(6)
         }
         val sb = StringBuilder()
-        sb.append("【泥浆生活 v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}) 诊断记录】\n")
+        sb.append("【江大生活 v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}) 诊断记录】\n")
         sb.append("设备: ${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE}, API ${Build.VERSION.SDK_INT})\n")
         sb.append("时间: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())}\n")
         sb.append("----------------------------\n")
@@ -287,7 +287,7 @@ object AppLogger {
 
         val text = sb.toString()
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("MudLife Error Log", text)
+        val clip = ClipData.newPlainText("Jiangda Life Error Log", text)
         cm.setPrimaryClip(clip)
         return text
     }

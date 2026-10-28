@@ -134,6 +134,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             pageState.SaveableStateProvider(page.ifEmpty { "tab:$tab" }) {
             when {
                 page == "login" -> LoginScreen(onCampusCard = loginSchool, onBack = back, onLoginSuccess = {
+                    life.lifeAccountAuthenticated()
                     phone = it; loggedIn = true; page = loginBack
                 })
                 page in setOf("codes", "bath", "dryer") -> Column {
@@ -383,7 +384,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
 @Composable private fun AccountPage(life: Boolean, logisticsLoggedIn: Boolean, school: Boolean, schoolExpired: Boolean,
     setup: Boolean, back: () -> Unit, finish: () -> Unit, select: (String) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp)) {
-        PageTitle(if (setup) "欢迎使用泥浆生活" else "账号管理", if (setup) null else back, false)
+        PageTitle(if (setup) "欢迎使用江大生活" else "账号管理", if (setup) null else back, false)
         if (setup) Text("按需登录，随时可以回来补充。", fontSize = 14.sp, color = AppColors.TextSecondary, modifier = Modifier.padding(bottom = 20.dp))
         SettingsGroup {
             AccountRow("学校账号", "付款码 · 余额 · 账单 · 电费", Icons.Outlined.School, school, schoolExpired) { select("school") }
@@ -415,7 +416,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
 
 @Composable private fun HomeWelcome(school: Boolean, login: () -> Unit, codes: () -> Unit, accounts: () -> Unit, card: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp)) {
-        PageTitle("泥浆生活", padded = false)
+        PageTitle("江大生活", padded = false)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FilledTonalButton(onClick = login, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) {
                 Icon(Icons.Outlined.WaterDrop, null, Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)); Text("登录趣智")

@@ -8,18 +8,21 @@ import cn.mudlife.app.api.registerAndLoginSafe
 import cn.mudlife.app.model.LoginData
 import cn.mudlife.app.utils.MD5Utils
 import cn.mudlife.app.utils.PrefsHelper
+import kotlinx.coroutines.CancellationException
 
 object AuthRepository {
     private suspend fun syncUserProjects() {
+        val owner = PrefsHelper.loginCode
         try {
             val pResp = NetworkModule.apiService.getUserProjectsSafe()
+            if (owner != PrefsHelper.loginCode) return
             if (pResp.success && !pResp.data.isNullOrEmpty()) {
                 val map = pResp.data.associate { it.projectId.toString() to it.accountId.toString() }
                 NetworkModule.setProjectAccounts(map)
                 PrefsHelper.saveProjectAccounts(map)
                 cn.mudlife.app.utils.AppLogger.i("Auth", "已成功同步多项目账户映射: $map")
             }
-        } catch (e: Exception) {
+        } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) {
             cn.mudlife.app.utils.AppLogger.w("Auth", "拉取多项目列表失败: ${e.message}")
         }
     }
@@ -54,7 +57,7 @@ object AuthRepository {
             } else {
                 Result.failure(Exception(response.displayMessage ?: "登录失败"))
             }
-        } catch (e: Exception) {
+        } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -64,7 +67,7 @@ object AuthRepository {
             val resp = NetworkModule.apiService.getVerificationCodeSafe(phone)
             if (resp.success) Result.success(Unit)
             else Result.failure(Exception(resp.displayMessage ?: "发送失败"))
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) { Result.failure(e) }
     }
 
     suspend fun smsLogin(phone: String, smsCode: String): Result<LoginData> {
@@ -82,6 +85,6 @@ object AuthRepository {
             } else {
                 Result.failure(Exception(response.displayMessage ?: "登录失败"))
             }
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) { Result.failure(e) }
     }
 }

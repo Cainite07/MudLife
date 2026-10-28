@@ -570,7 +570,7 @@ fun UserScreen(
 
         Spacer(Modifier.height(2.dp))
         Text(
-            "泥浆生活 v${cn.mudlife.app.BuildConfig.VERSION_NAME} · 专注纯净校园生活",
+            "江大生活 v${cn.mudlife.app.BuildConfig.VERSION_NAME} · 专注纯净校园生活",
             color = AppColors.TextSecondary.copy(alpha = 0.6f),
             fontSize = 12.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally)

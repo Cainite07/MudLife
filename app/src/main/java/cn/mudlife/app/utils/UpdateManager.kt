@@ -9,14 +9,17 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import com.google.gson.Gson
 import cn.mudlife.app.BuildConfig
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
+import java.io.IOException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -79,22 +82,26 @@ object UpdateManager {
         if (cn.mudlife.app.BuildConfig.DEBUG) {
             return@withContext Result.failure(IllegalStateException("修复预览版请使用单独提供的测试包更新"))
         }
-        fun fetch(base: String): UpdateInfo? = try {
-            val req = Request.Builder().url(base)
-                .header("User-Agent", "MudLife-App/${BuildConfig.VERSION_NAME}").build()
-            client.newCall(req).execute().use { response ->
-                if (!response.isSuccessful) null
-                else response.body?.string()?.let(::parseManifest)
-            }
-        } catch (cancelled: CancellationException) { throw cancelled }
-          catch (_: Exception) { null }
-
-        // Stable CDN paths avoid cache-busting query strings rejected on some direct routes.
-        // All sources share a bounded deadline; a failed node cannot suppress another reply.
-        val info = coroutineScope { CHECK_URLS.map { url -> async(Dispatchers.IO) { fetch(url) } }.awaitAll() }
-            .filterNotNull().maxByOrNull { it.versionCode }
+        val info = collectManifests(CHECK_URLS, BuildConfig.VERSION_CODE, fetch = ::fetchManifest)
         if (info != null) Result.success(info)
         else Result.failure(Exception("检测更新失败，请稍后重试"))
+    }
+
+    private suspend fun fetchManifest(url: String): UpdateInfo? = suspendCancellableCoroutine { continuation ->
+        val call = client.newCall(Request.Builder().url(url)
+            .header("User-Agent", "MudLife-App/${BuildConfig.VERSION_NAME}").build())
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (continuation.isActive) continuation.resume(null)
+            }
+            override fun onResponse(call: Call, response: Response) {
+                val info = try { response.use {
+                    if (it.isSuccessful) it.body?.string()?.let(::parseManifest) else null
+                } } catch (_: Exception) { null }
+                if (continuation.isActive) continuation.resume(info)
+            }
+        })
     }
 
     suspend fun downloadApk(
@@ -127,7 +134,7 @@ object UpdateManager {
             if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
                 context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                error("请允许泥浆生活安装应用，返回后再次点更新")
+                error("请允许江大生活安装应用，返回后再次点更新")
             }
             val apkUri = FileProvider.getUriForFile(
                 context,
