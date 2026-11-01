@@ -11,6 +11,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CERT = '00da3d63a98a2f73565b306c18c67ca2f4fe27fc2ae71599544f96593637c2df'
@@ -147,6 +148,21 @@ def main():
     first = metadata.stdout.splitlines()[0] if metadata.returncode == 0 else ''
     if not all(value in first for value in ["name='cn.mudlife.app'", f"versionCode='{code}'", f"versionName='{version}'"]):
         raise ValueError('APK package/version mismatch.')
+    with zipfile.ZipFile(apk) as archive:
+        entries = archive.namelist()
+        abis = {path.split('/')[1] for path in entries if path.startswith('lib/') and path.endswith('.so')}
+        if abis != {'arm64-v8a'}:
+            raise ValueError('Official APK must contain ARM64 native libraries only.')
+        required = {
+            'lib/arm64-v8a/libbarhopper_v3.so',
+            'lib/arm64-v8a/libimage_processing_util_jni.so',
+            'lib/arm64-v8a/libsurface_util_jni.so',
+            'assets/mlkit_barcode_models/barcode_ssd_mobilenet_v1_dmp25_quant.tflite',
+            'assets/mlkit_barcode_models/oned_auto_regressor_mobile.tflite',
+            'assets/mlkit_barcode_models/oned_feature_extractor_mobile.tflite',
+        }
+        if any(path not in entries or archive.getinfo(path).file_size == 0 for path in required):
+            raise ValueError('APK is missing a required native library or offline barcode model.')
     apis = [Api('github', credential('github.com')), Api('gitee', credential('gitee.com'))]
     # Read-only preflight: refuse unrelated branch histories and conflicting tags.
     for remote in ['origin', 'gitee']:
@@ -167,8 +183,9 @@ def main():
     checksum = hashlib.sha256(target.read_bytes()).hexdigest()
     sums = output / 'SHA256SUMS.txt'
     sums.write_text(f'{checksum}  {name}\n', encoding='utf-8')
-    body = (f"{manifest['changelog']}\n\nAndroid 8.0+ · 正式包 cn.mudlife.app · {version} / {code}\n\n"
-            f"沿用固定发行签名，支持同签名系列覆盖升级。宣传图均为虚构演示数据。\n\n"
+    body = (f"{manifest['changelog']}\n\nAndroid 8.0+ · ARM64 · {version} / {code}\n\n"
+            f"安装包：`{name}`。内置离线扫码模型，保留全部现有功能。\n\n"
+            f"包名 `cn.mudlife.app`，沿用固定发行签名，支持同签名版本覆盖升级并保留本机数据。\n\n"
             f"源码提交：`{head}`\n\nSHA-256：`{checksum}`\n\n"
             f"[Gitee 国内下载]({gitee_url}) · [GitHub 下载]({github_url})")
     for remote in ['origin', 'gitee']:

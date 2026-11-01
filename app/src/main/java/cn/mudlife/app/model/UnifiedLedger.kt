@@ -52,12 +52,13 @@ object UnifiedLedger {
 }
 
 enum class CampusBillCategory(val label: String) {
-    ALL("全部"), FOOD("饮食"), BATH("洗澡"), RECHARGE("充值"), OTHER("其他")
+    ALL("全部"), FOOD("饮食"), BATH("洗澡"), DRYER("吹风"), WATER("饮水"), RECHARGE("充值"), OTHER("其他")
 }
 
-/** The everyday statement belongs to the campus card, without device-wallet transfers. */
+/** Semantic categories and expense totals; wallet topups never become a second expense. */
 object CampusBillLedger {
-    private val drinking = Regex("直饮|饮水|喝水|水机|趣智充值")
+    private val drinking = Regex("直饮|饮水|喝水|水机")
+    private val dryer = Regex("吹风|电吹风|风筒|风机")
     private val bathing = Regex("洗浴|洗澡|淋浴|浴室|热水")
     private val food = Regex("食堂|餐厅|餐饮|饮食|饭|面馆|小吃|早餐|午餐|晚餐|快餐|美食|食府|食坊|咖啡|奶茶|烘焙|蛋糕")
 
@@ -65,6 +66,8 @@ object CampusBillLedger {
         val text = listOf(bill.title, bill.merchant, bill.description).joinToString(" ")
         return when {
             bill.type == "2" || (BillLedger.direction(bill) == "1" && text.contains("充值")) -> CampusBillCategory.RECHARGE
+            dryer.containsMatchIn(text) -> CampusBillCategory.DRYER
+            drinking.containsMatchIn(text) -> CampusBillCategory.WATER
             bathing.containsMatchIn(text) -> CampusBillCategory.BATH
             food.containsMatchIn(text) -> CampusBillCategory.FOOD
             else -> CampusBillCategory.OTHER
@@ -74,7 +77,7 @@ object CampusBillLedger {
     fun select(records: List<Bill>, month: YearMonth?, category: CampusBillCategory = CampusBillCategory.ALL): List<Bill> =
         records.filter { bill ->
             (month == null || UnifiedLedger.normalizeTime(bill.time).startsWith(month.toString())) &&
-                !drinking.containsMatchIn(listOf(bill.title, bill.merchant, bill.description).joinToString(" ")) &&
+                !listOf(bill.title, bill.merchant, bill.description).joinToString(" ").contains("趣智充值") &&
                 (category == CampusBillCategory.ALL || this.category(bill) == category)
         }.distinctBy(BillLedger::key).sortedByDescending { UnifiedLedger.normalizeTime(it.time) }
 

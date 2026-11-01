@@ -9,9 +9,9 @@ class CampusBillLedgerTest {
     private fun bill(id: String, title: String, fen: Long? = 500, type: String = "1", time: String = "2026-10-24 12:00:00") =
         Bill(id, title, time, fen, type, "", title, "", null)
 
-    @Test fun statementExcludesDrinkingWithoutChangingHistory() {
+    @Test fun statementIncludesDrinkingButExcludesWalletTopupsWithoutChangingHistory() {
         val records = listOf(bill("food", "第一食堂"), bill("bath", "洗浴消费"), bill("water", "直饮水"), bill("topup", "趣智充值", type = "2"))
-        assertEquals(listOf("food", "bath"), CampusBillLedger.select(records, null).map { it.id })
+        assertEquals(listOf("food", "bath", "water"), CampusBillLedger.select(records, null).map { it.id })
         assertEquals(4, records.size)
     }
 

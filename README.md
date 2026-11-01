@@ -2,9 +2,9 @@
   <img src="assets/mudlife-icon-preview.png" width="88" alt="MudLife 校园之门图标" />
 </p>
 
-<h1 align="center">泥浆生活 · MudLife</h1>
+<h1 align="center">江大生活 · Jiangda Life</h1>
 <p align="center"><b>校园日常，放在一起。</b><br>江苏大学一卡通 · 趣智校园 · 趣智热水后勤</p>
-<p align="center">v1.4.7 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
+<p align="center">v1.4.8 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
 
 <p align="center">
   <a href="https://gitee.com/cainite/MudLife/releases"><b>Gitee 国内下载</b></a> &emsp;
@@ -15,9 +15,9 @@
 
 ![校园日常，放在一起](assets/promo/overview.png)
 
-MudLife 面向江苏大学的校园日常，把校园卡付款、生活账单、饮水机和两组使用码放进同一个应用。温暖纸黄与墨绿配色，搭配轻触反馈，让常用操作更顺手。
+江大生活面向江苏大学的校园日常，把校园卡付款、生活账单、饮水机和两组使用码放进同一个应用。温暖纸黄与墨绿配色，搭配轻触反馈，让常用操作更顺手。
 
-<p align="center"><a href="assets/promo/mudlife-social.png">下载完整宣传长图 · 分享给同学</a></p>
+<p align="center"><a href="assets/promo/jiangda-life-social.png">下载完整宣传长图 · 分享给同学</a></p>
 
 ## 四个页面，各有安排
 
@@ -35,7 +35,7 @@ MudLife 面向江苏大学的校园日常，把校园卡付款、生活账单、
   <tr>
     <td width="50%" valign="top">
       <h3>账单 · 理清开销</h3>
-      <p>余额与充值入口集中展示。<br>按月份和分类查看校园卡流水。</p>
+      <p>余额与充值入口集中展示。<br>按月份和分类查看校园卡及独立设备消费。</p>
     </td>
     <td width="50%" valign="top">
       <h3>我的 · 管理服务</h3>
@@ -60,9 +60,9 @@ MudLife 面向江苏大学的校园日常，把校园卡付款、生活账单、
 
 ![校园卡余额与分类账单](assets/promo/bills.png)
 
-账单统一采用**学校校园卡流水，只统计支出**。充值保留明细，退款、补助不计入消费，趣智独立钱包记录不混入。已同步账单保留本机缓存，月份选择按账号保存。
+账单以**学校校园卡流水为基础，补充饮水与吹风机的独立设备消费**。设备记录按所选月份查询，排除充值、退款与明确校园卡扣款，同订单优先采用学校流水。学校账单沿用本机缓存，设备记录仅在内存中按账号保存，退出或换号时清除。
 
-顶部可选卡、查看余额与充值，下方按日期分组，提供全部、饮食、洗澡、充值、其他筛选。同步未完成或金额缺失时，不显示不完整的消费总额。
+顶部可选卡、查看余额与充值，下方按日期分组，提供全部、饮食、洗澡、吹风、饮水、充值、其他筛选。当天饮水合并为最后一行“饮水 · N笔”，点击展开明细。同步未完成或金额缺失时，不显示不完整的消费总额。
 
 > 宣传图为演示界面，数据全部虚构；付款码与使用码均已隐藏。图片不含真实姓名、手机号、学号、宿舍、设备标识或账号会话。
 
@@ -80,6 +80,8 @@ Kotlin 2.0.21 · Compose / Material 3 · Retrofit / OkHttp · MQTT · CameraX / 
 ./gradlew testDebugUnitTest assembleDebug
 ./gradlew assembleRelease
 ```
+
+正式版默认仅打包 **ARM64（arm64-v8a）**，文件名统一为 `MudLife-版本号.apk`。1.4.8 安装包约 **9.98 MiB**，保留全部现有功能及内置离线扫码模型；不适用于仅支持32位或x86架构的设备。
 
 正式构建需要维护者已有的固定签名，私钥与凭据不在仓库中。详见 [签名说明](signing/README.md) · [双平台发布](docs/RELEASING.md) · [宣传图制作](assets/promo/prompts.md)。
 

@@ -178,7 +178,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
                         UnifiedCardPage(campus)
                     }
                 }
-                tab == 2 -> UnifiedBillsPage(campus, loginSchool, openRecharge)
+                tab == 2 -> UnifiedBillsPage(campus, life, loggedIn, loginSchool, openRecharge)
                 else -> UnifiedProfile(campus, loginSchool, accounts = { page = "accounts" },
                     electric = { featureBack = tab; page = "electric" }, codes = { codesBack = ""; page = "codes" },
                     checkingUpdate = life.isCheckingUpdate, checkUpdate = { life.checkUpdate(true) })

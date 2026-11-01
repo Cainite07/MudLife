@@ -20,13 +20,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.mudlife.app.model.CampusBillCategory
 import cn.mudlife.app.model.CampusBillLedger
+import cn.mudlife.app.model.DeviceExpenses
 import cn.mudlife.app.ui.theme.AppColors
 import cn.mudlife.app.utils.HapticHelper
 import cn.mudlife.app.utils.PrefsHelper
 import cn.mudlife.campuscard.*
 
 @OptIn(ExperimentalMaterialApi::class)
-@Composable internal fun UnifiedBillsPage(campus: CampusViewModel, schoolLogin: () -> Unit, recharge: () -> Unit) {
+@Composable internal fun UnifiedBillsPage(campus: CampusViewModel, life: MainViewModel, lifeLoggedIn: Boolean, schoolLogin: () -> Unit, recharge: () -> Unit) {
     val context = LocalContext.current
     val tap = { HapticHelper.tick(context) }
     // Preserve the month stored by the previous combined statement.
@@ -39,17 +40,30 @@ import cn.mudlife.campuscard.*
     var monthMenu by remember { mutableStateOf(false) }
     var detail by remember(campus.currentCard?.account) { mutableStateOf<Bill?>(null) }
     var limit by remember(period, category, campus.currentCard?.account) { mutableIntStateOf(50) }
-    val monthRows = remember(campus.allBills, month) { CampusBillLedger.select(campus.allBills, month) }
+    val devices = life.deviceBills
+    val deviceMonth = month ?: java.time.YearMonth.now()
+    LaunchedEffect(deviceMonth, lifeLoggedIn) { devices.load(deviceMonth) }
+    val deviceRecords = if (lifeLoggedIn) devices.records.values.flatten() else emptyList()
+    val combined = remember(campus.allBills, deviceRecords) { DeviceExpenses.merge(campus.allBills, deviceRecords) }
+    val monthRows = remember(combined, month) { CampusBillLedger.select(combined, month) }
     val rows = remember(monthRows, category) { monthRows.filter { category == CampusBillCategory.ALL || CampusBillLedger.category(it) == category } }
-    val months = remember(campus.allBills, month) { (BillLedger.months(campus.allBills) + listOfNotNull(month)).distinct().sortedDescending() }
-    val expense = remember(monthRows, campus.billsComplete) { if (campus.billsComplete) CampusBillLedger.expense(monthRows) else null }
-    val refreshing = campus.billSyncBusy || campus.busy
-    val pull = rememberPullRefreshState(refreshing, { if (campus.needsLogin) schoolLogin() else { campus.refresh(); campus.refreshBills() } })
+    val displayRows = remember(rows) { DeviceExpenses.rows(rows) }
+    val months = remember(combined, month) { (BillLedger.months(combined) + listOfNotNull(month)).distinct().sortedDescending() }
+    val devicesComplete = !lifeLoggedIn || (month != null && month in devices.records && deviceMonth !in devices.errors && deviceMonth !in devices.loading)
+    val expense = if ((!campus.hasSession || campus.billsComplete) && devicesComplete) CampusBillLedger.expense(monthRows) else null
+    var expandedWater by rememberSaveable(owner, period, PrefsHelper.userId) { mutableStateOf(emptyList<String>()) }
+    val refreshing = campus.billSyncBusy || campus.busy || deviceMonth in devices.loading
+    val pull = rememberPullRefreshState(refreshing, {
+        if (campus.needsLogin && !lifeLoggedIn) schoolLogin() else {
+            if (campus.hasSession && !campus.needsLogin) { campus.refresh(); campus.refreshBills() }
+            devices.load(deviceMonth, force = true)
+        }
+    })
     Box(Modifier.fillMaxSize().pullRefresh(pull)) {
         LazyColumn(Modifier.fillMaxSize().padding(horizontal = 22.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
             item(key = "title") { PageTitle("账单", padded = false) }
             item(key = "balance") { CampusBalance(campus, schoolLogin, recharge) }
-            if (campus.hasSession) {
+            if (campus.hasSession || lifeLoggedIn) {
                 item(key = "summary") {
                     Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) {
@@ -77,27 +91,37 @@ import cn.mudlife.campuscard.*
                     if (campus.billError != null) TextButton(onClick = { tap(); if (campus.needsLogin) schoolLogin() else campus.refreshBills() }) {
                         Text(if (campus.needsLogin) "学校登录已过期，重新登录" else "同步失败，点击重试", fontSize = 12.sp)
                     }
+                    if (lifeLoggedIn && deviceMonth in devices.errors) TextButton(onClick = { tap(); devices.load(deviceMonth, force = true) }) {
+                        Text(devices.errors.getValue(deviceMonth), fontSize = 12.sp)
+                    }
+                    if (lifeLoggedIn && month == null) Text("饮水与吹风机记录按月同步，请选择月份查看完整支出", fontSize = 12.sp, color = AppColors.TextSecondary)
                 }
-                rows.take(limit).groupBy { it.time.take(10) }.forEach { (day, bills) ->
+                displayRows.take(limit).groupBy { it.day }.forEach { (day, entries) ->
                     item(key = "day:$day") { Text(day, fontSize = 12.sp, color = AppColors.TextSecondary,
                         modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 6.dp)) }
-                    items(bills, key = BillLedger::key) { bill ->
-                        Row(Modifier.fillMaxWidth().clickable { tap(); detail = bill }.heightIn(min = 68.dp), verticalAlignment = Alignment.CenterVertically) {
-                            val kind = CampusBillLedger.category(bill)
-                            Box(Modifier.size(38.dp).background(AppColors.Card, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                                Icon(when (kind) { CampusBillCategory.BATH -> Icons.Outlined.Shower; CampusBillCategory.FOOD -> Icons.Outlined.Restaurant;
-                                    CampusBillCategory.RECHARGE -> Icons.Outlined.AccountBalanceWallet; else -> Icons.Outlined.ReceiptLong }, null, Modifier.size(19.dp), tint = AppColors.Accent)
+                    items(entries, key = { it.key }) { entry ->
+                        if (!entry.drinking) StatementBillRow(entry.bills.single()) { tap(); detail = it }
+                        else {
+                            val expanded = day in expandedWater
+                            val total = CampusBillLedger.expense(entry.bills)
+                            Row(Modifier.fillMaxWidth().clickable { tap(); expandedWater = if (expanded) expandedWater - day else expandedWater + day }
+                                .heightIn(min = 68.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(38.dp).background(AppColors.Card, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Outlined.WaterDrop, null, Modifier.size(19.dp), tint = AppColors.Accent)
+                                }
+                                Text("饮水 · ${entry.bills.size} 笔", Modifier.weight(1f).padding(horizontal = 12.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(total?.let { "−${Money.yuan(it)}" } ?: "—", fontSize = 15.sp)
+                                Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, if (expanded) "收起饮水明细" else "展开饮水明细",
+                                    Modifier.padding(start = 6.dp).size(18.dp), tint = AppColors.TextSecondary)
                             }
-                            Column(Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp)) {
-                                Text(bill.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                                Text("${kind.label} · ${bill.time.drop(11).take(5)}", fontSize = 11.sp, color = AppColors.TextSecondary)
+                            HorizontalDivider(color = AppColors.Border.copy(alpha = .45f), modifier = Modifier.padding(start = 50.dp))
+                            if (expanded) Column(Modifier.padding(start = 16.dp)) {
+                                entry.bills.forEach { bill -> StatementBillRow(bill) { tap(); detail = it } }
                             }
-                            Text(bill.displayAmount, fontSize = 15.sp, color = if (BillLedger.direction(bill) == "1") AppColors.TextSecondary else AppColors.TextPrimary)
                         }
-                        HorizontalDivider(color = AppColors.Border.copy(alpha = .45f), modifier = Modifier.padding(start = 50.dp))
                     }
                 }
-                if (rows.size > limit) item { TextButton(onClick = { tap(); limit += 50 }, modifier = Modifier.fillMaxWidth()) { Text("加载更多") } }
+                if (displayRows.size > limit) item { TextButton(onClick = { tap(); limit += 50 }, modifier = Modifier.fillMaxWidth()) { Text("加载更多") } }
                 if (rows.isEmpty() && !refreshing) item { Text(if (campus.billError != null) "账单暂时无法加载" else "这个月份暂无${if (category == CampusBillCategory.ALL) "" else category.label}记录",
                     color = AppColors.TextSecondary, modifier = Modifier.padding(vertical = 28.dp)) }
             }
@@ -112,6 +136,28 @@ import cn.mudlife.campuscard.*
             if (bill.id.isNotBlank()) Text("订单 ${bill.id}", fontSize = 12.sp)
         }
     }, confirmButton = { TextButton(onClick = { tap(); detail = null }) { Text("关闭") } }) }
+}
+
+@Composable private fun StatementBillRow(bill: Bill, open: (Bill) -> Unit) {
+    val kind = CampusBillLedger.category(bill)
+    Row(Modifier.fillMaxWidth().clickable { open(bill) }.heightIn(min = 68.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(38.dp).background(AppColors.Card, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+            Icon(when (kind) {
+                CampusBillCategory.BATH -> Icons.Outlined.Shower
+                CampusBillCategory.FOOD -> Icons.Outlined.Restaurant
+                CampusBillCategory.WATER -> Icons.Outlined.WaterDrop
+                CampusBillCategory.DRYER -> Icons.Outlined.Air
+                CampusBillCategory.RECHARGE -> Icons.Outlined.AccountBalanceWallet
+                else -> Icons.Outlined.ReceiptLong
+            }, null, Modifier.size(19.dp), tint = AppColors.Accent)
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(bill.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text("${kind.label} · ${bill.time.drop(11).take(5)}", fontSize = 11.sp, color = AppColors.TextSecondary)
+        }
+        Text(bill.displayAmount, fontSize = 15.sp, color = if (BillLedger.direction(bill) == "1") AppColors.TextSecondary else AppColors.TextPrimary)
+    }
+    HorizontalDivider(color = AppColors.Border.copy(alpha = .45f), modifier = Modifier.padding(start = 50.dp))
 }
 
 @Composable private fun CampusBalance(vm: CampusViewModel, login: () -> Unit, recharge: () -> Unit) {

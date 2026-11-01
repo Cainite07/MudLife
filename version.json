@@ -1,11 +1,11 @@
 {
-  "versionCode": 36,
-  "versionName": "1.4.7",
-  "releaseDate": "2026-10-28",
-  "title": "江大生活 · Jiangda Life v1.4.7",
-  "changelog": "· 本版起软件名称改为“江大生活 / Jiangda Life”，仓库与更新地址沿用原有配置。\n· 使用码、钱包和项目账号同步增加会话校验，退出或换号后取消旧任务，防止迟到响应写回。\n· 首页刷新与后勤登录不再加载无展示入口的旧账单，保留设备所需的项目账号同步。\n· 下拉刷新跟随实际任务完成，避免固定一秒结束和重复刷新。\n· 更新检查收到有效版本后短暂收集其他结果并取消慢节点，继续选取较高版本。\n· 移除已替代的旧账单页面，保留全部扫码库、离线模型及设备架构支持；固定签名不变。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.4.7/MudLife-1.4.7.apk",
+  "versionCode": 38,
+  "versionName": "1.4.8",
+  "releaseDate": "2026-11-01",
+  "title": "江大生活 · Jiangda Life v1.4.8",
+  "changelog": "· 账单新增支付宝等独立支付的吹风机和饮水消费，校园卡扣款不重复统计。\n· 当天饮水记录合并为最后一行，显示笔数与总额，点击即可展开明细。\n· 新增吹风、饮水分类；设备账单按月加载，支持下拉刷新与失败重试。\n· 正式版安装包精简至约9.98 MiB，仅支持ARM64设备，保留全部现有功能和内置离线扫码模型。\n· 沿用原包名与固定签名，支持覆盖升级并保留本机登录和保存的数据。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.4.8/MudLife-1.4.8.apk",
   "mirrors": [
-    "https://gitee.com/cainite/MudLife/releases/download/v1.4.7/MudLife-1.4.7.apk"
+    "https://gitee.com/cainite/MudLife/releases/download/v1.4.8/MudLife-1.4.8.apk"
   ]
 }

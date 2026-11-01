@@ -12,14 +12,18 @@
 ## 每次发行
 
 1. 检查未提交改动和版本基线，完成必要修改及适度验证。
-2. 同步 `app/build.gradle.kts`、`version.json`、README、CHANGELOG 的版本；更新清单中首先填写 Gitee 的对应 APK 下载地址。
-3. 使用原签名运行单元测试及 `assembleRelease`，核对证书与包名。Windows 中文路径测试启动失败时，可按 CODEX.md 的已知环境方法构建。
+2. 同步 `app/build.gradle.kts`、`version.json`、README、CHANGELOG 的版本；`downloadUrl` 填写 GitHub 的对应 APK 地址，`mirrors` 第一项填写 Gitee 地址，应用优先使用国内源。
+3. 正式版默认仅包含 ARM64（arm64-v8a），保留全部现有功能及内置离线扫码模型。安装包文件名统一为 `MudLife-版本号.apk`，不带架构或预览后缀。使用原签名运行必要测试及 `assembleRelease`，核对证书、包名、架构和扫码模型。Windows 中文路径测试启动失败时，可按 CODEX.md 的已知环境方法构建。
 4. 检查本次源码与宣传素材不含真实账号、二维码、使用码、会话、导出账单、私钥等信息。宣传图使用虚构演示数据并注明。
 5. 将本次完整成果提交到 Git，使工作区干净。不要把 APK 或构建目录加入 Git。
 6. 在仓库根目录运行 `python scripts/publish_release.py`。脚本先核对版本、包名、固定证书和凭据，再将相同标签及源码推送到两端，分别上传 APK 和 `SHA256SUMS.txt`。先核对发行附件，最后更新两端 main 和正式发行状态。
 7. 检查输出的两端发行地址、源码提交、文件大小和 SHA-256；Gitee 下载核对显式禁用本机代理。脚本可重复运行以继续中断的同一版本；同名附件内容冲突时停止，不自动删除或覆盖。
 
 脚本使用本机 Git Credential Manager，不将令牌写入文件或输出。生成的 APK 副本及校验文件放在忽略的 `app/build/outputs/dual-release/` 下。
+
+## 公开说明
+
+README、CHANGELOG、version.json 和发行页正文面向使用者，只描述功能变化、兼容性、下载与升级信息。协作对话、授权过程、个人设备信息及操作流水不写入公开说明。维护文档保留可复用的技术约束与发布流程，不追加聊天记录。
 
 ## 应用内更新
 

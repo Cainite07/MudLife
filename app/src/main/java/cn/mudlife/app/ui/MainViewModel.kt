@@ -90,6 +90,7 @@ class MainViewModel(
     private var orderVerificationJob: Job? = null
     private var accountGeneration = 0L
     private val lifeRequests = AccountRequests(viewModelScope) { listOf(PrefsHelper.loginCode, PrefsHelper.userId) }
+    internal val deviceBills = DeviceBillStore(viewModelScope)
     private val bathRequests = AccountRequests(viewModelScope) { listOf(PrefsHelper.qzhqLoginCode, PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }) }
     private var bathLoginJob: Job? = null
     private var refreshJob: Job? = null
@@ -827,6 +828,7 @@ class MainViewModel(
     }
 
     fun logout() {
+        deviceBills.clear()
         accountGeneration++
         lifeRequests.invalidate()
         refreshGeneration++; refreshJob?.cancel(); isRefreshing = false
@@ -896,6 +898,7 @@ class MainViewModel(
         if (isRealKick) {
             cn.mudlife.app.utils.AppLogger.e("Auth", "触发账号强制下线: $msg")
             kickedOut = true
+            deviceBills.clear()
             PrefsHelper.clearLifeAccount()
         }
     }
@@ -904,11 +907,13 @@ class MainViewModel(
         if (m.contains("401") || m.contains("403") || m.contains("Unauthorized") || m.contains("Forbidden")) {
             cn.mudlife.app.utils.AppLogger.e("Auth", "触发网络鉴权失效下线: $m")
             kickedOut = true
+            deviceBills.clear()
             PrefsHelper.clearLifeAccount()
         }
     }
 
     fun lifeAccountAuthenticated() {
+        deviceBills.clear()
         lifeRequests.invalidate()
         walletInfo = null; useCodeData = null
         candidateUseCode = ""; showDryerCodeModal = false; isRollingUseCode = false

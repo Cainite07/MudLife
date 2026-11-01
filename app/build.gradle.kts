@@ -17,8 +17,8 @@ android {
         applicationId = "cn.mudlife.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 36
-        versionName = "1.4.7"
+        versionCode = 38
+        versionName = "1.4.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -54,6 +54,8 @@ android {
             versionNameSuffix = "-refresh-preview"
         }
         release {
+            // Official releases target ARM64; bundled offline scanning remains intact.
+            ndk { abiFilters += "arm64-v8a" }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
