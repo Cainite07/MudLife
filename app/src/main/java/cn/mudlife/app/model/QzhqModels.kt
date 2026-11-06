@@ -11,6 +11,9 @@ data class QzhqResponse<T>(
     @SerializedName("data") val data: T? = null
 ) {
     val isSuccess: Boolean get() = errorCode == 0
+    val isSessionExpired: Boolean get() = errorCode == 8 || errorCode == 401
+    fun expiresSession(requestToken: String, currentToken: String): Boolean =
+        requestToken.isNotBlank() && requestToken == currentToken && isSessionExpired
 }
 
 /**

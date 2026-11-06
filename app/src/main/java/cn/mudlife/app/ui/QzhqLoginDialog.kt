@@ -46,7 +46,7 @@ fun QzhqLoginDialog(
         title = {
             Column {
                 Text(
-                    text = "登录江大后勤热水专区",
+                    text = "登录趣智后勤热水",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = AppColors.TextPrimary

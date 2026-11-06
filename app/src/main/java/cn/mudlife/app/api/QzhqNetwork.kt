@@ -21,6 +21,20 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 object QzhqNetwork {
+    private val invalidSession = kotlinx.coroutines.flow.MutableStateFlow("")
+    val invalidSessions: kotlinx.coroutines.flow.StateFlow<String> = invalidSession
+
+    private suspend fun <T> checkSession(response: QzhqResponse<T>, token: String): QzhqResponse<T> {
+        withContext(Dispatchers.Main.immediate) {
+            // A late response from an old login must not expire its replacement.
+            if (response.expiresSession(token, PrefsHelper.qzhqLoginCode)) {
+                PrefsHelper.qzhqSessionExpired = true
+                invalidSession.value = token
+            }
+        }
+        return response
+    }
+
     private val gson = Gson()
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -67,7 +81,11 @@ object QzhqNetwork {
                         } else {
                             cont.resumeWithException(Exception("响应内容为空"))
                         }
+                    } else if (response.code() == 401) {
+                        response.errorBody()?.close()
+                        cont.resume("""{"errorCode":401,"message":"登录失效，请重新登录"}""")
                     } else {
+                        response.errorBody()?.close()
                         cont.resumeWithException(Exception("HTTP ${response.code()}: ${response.message()}"))
                     }
                 }
@@ -120,6 +138,8 @@ object QzhqNetwork {
         val resp = parse(json, QzhqLoginData::class.java)
         if (resp.isSuccess && resp.data != null) {
             resp.data.loginCode?.let { PrefsHelper.qzhqLoginCode = it }
+            PrefsHelper.qzhqSessionExpired = false
+            invalidSession.value = ""
             PrefsHelper.qzhqPhone = phone
             val pid = if (resp.data.projectId > 0) resp.data.projectId.toString() else "43"
             PrefsHelper.qzhqProjectId = pid
@@ -139,6 +159,8 @@ object QzhqNetwork {
         val resp = parse(json, QzhqLoginData::class.java)
         if (resp.isSuccess && resp.data != null) {
             resp.data.loginCode?.let { PrefsHelper.qzhqLoginCode = it }
+            PrefsHelper.qzhqSessionExpired = false
+            invalidSession.value = ""
             PrefsHelper.qzhqPhone = phone
             val pid = if (resp.data.projectId > 0) resp.data.projectId.toString() else "43"
             PrefsHelper.qzhqProjectId = pid
@@ -163,7 +185,7 @@ object QzhqNetwork {
                     endDate = nowStr,
                     curNum = curNum
                 ).awaitString()
-                val pageResp = parseList(json, cn.mudlife.app.model.QzhqWalletBillItem::class.java)
+                val pageResp = checkSession(parseList(json, cn.mudlife.app.model.QzhqWalletBillItem::class.java), loginCode)
                 if (pageResp.isSuccess) {
                     val list = pageResp.data ?: emptyList()
                     allBills.addAll(list)
@@ -195,20 +217,20 @@ object QzhqNetwork {
     suspend fun getUseCode(phone: String, loginCode: String): QzhqResponse<QzhqUseCodeData> {
         val projectId = PrefsHelper.qzhqProjectId
         val json = apiService.getUseCode(phone = phone, projectId = projectId, loginCode = loginCode).awaitString()
-        val resp = parse(json, QzhqUseCodeData::class.java)
+        val resp = checkSession(parse(json, QzhqUseCodeData::class.java), loginCode)
         return resp
     }
 
     suspend fun updateUseCodeStatus(status: Int, phone: String, loginCode: String): QzhqResponse<Unit> {
         val projectId = PrefsHelper.qzhqProjectId
         val json = apiService.updateUseCodeStatus(status = status, phone = phone, projectId = projectId, loginCode = loginCode).awaitString()
-        val resp = parse(json, Unit::class.java)
+        val resp = checkSession(parse(json, Unit::class.java), loginCode)
         return resp
     }
 
     suspend fun setUseCode(code: String, phone: String, loginCode: String): QzhqResponse<Unit> {
         val projectId = PrefsHelper.qzhqProjectId
         val json = apiService.setUseCode(securityCode = code, phone = phone, projectId = projectId, loginCode = loginCode).awaitString()
-        return parse(json, Unit::class.java)
+        return checkSession(parse(json, Unit::class.java), loginCode)
     }
 }

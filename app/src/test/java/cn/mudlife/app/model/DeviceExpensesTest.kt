@@ -23,7 +23,6 @@ class DeviceExpensesTest {
         assertNull(DeviceExpenses.parse(BillItem(refundBillDTO = dto())))
         assertNull(DeviceExpenses.parse(BillItem(laundryBillDTO = dto(payment = "校园卡扣费"))))
         assertNull(DeviceExpenses.parse(BillItem(laundryBillDTO = dto(name = "共享洗衣机"))))
-        assertNull(DeviceExpenses.parse(BillItem(consumeBillDTO = dto(name = "浴室热水器"))))
         assertNull(DeviceExpenses.parse(BillItem(laundryBillDTO = dto(payment = ""))))
     }
 
@@ -38,6 +37,28 @@ class DeviceExpensesTest {
         assertEquals(listOf(official), DeviceExpenses.merge(listOf(official), listOf(device, device)))
         val second = DeviceExpenses.parse(BillItem(laundryBillDTO = dto(id = "other")))!!
         assertEquals(2, DeviceExpenses.merge(emptyList(), listOf(device, device, second)).size)
+    }
+
+    @Test fun heatMeterWithoutPaymentSourceStaysVisibleButOutsideExpenseTotals() {
+        val pending = DeviceExpenses.parse(BillItem(consumeBillDTO = dto(name = "热水表:M750按键型", payment = "", amount = "2.52", id = "bath")))!!
+        assertEquals(CampusBillCategory.BATH, CampusBillLedger.category(pending.bill))
+        assertEquals(252L, pending.bill.fen)
+        assertTrue(DeviceExpenses.pending(pending.bill))
+        assertEquals(0L, CampusBillLedger.expense(listOf(pending.bill)))
+        assertEquals(listOf(pending.bill), DeviceExpenses.merge(emptyList(), listOf(pending)))
+        val official = pending.bill.copy(id = "bath", payment = "校园卡", description = "洗浴消费")
+        assertEquals(listOf(official), DeviceExpenses.merge(listOf(official), listOf(pending)))
+        assertEquals(252L, CampusBillLedger.expense(DeviceExpenses.merge(listOf(official), listOf(pending))))
+    }
+
+    @Test fun confirmedIndependentBathCountsButCampusOrUnknownBathDoesNot() {
+        val independent = DeviceExpenses.parse(BillItem(consumeBillDTO = dto(name = "浴室热水器", amount = "2.10")))!!
+        assertFalse(DeviceExpenses.pending(independent.bill))
+        assertEquals(210L, CampusBillLedger.expense(listOf(independent.bill)))
+        val campus = DeviceExpenses.parse(BillItem(consumeBillDTO = dto(name = "热水表", payment = "校园卡扣费").copy(thirdTradeMoney = "0.60")))!!
+        assertTrue(DeviceExpenses.pending(campus.bill))
+        val other = independent.copy(order = "other", bill = independent.bill.copy(id = "device:other"))
+        assertEquals(2, DeviceExpenses.merge(emptyList(), listOf(independent, other)).size)
     }
 
     @Test fun allDailyWaterIsOneFinalRowRegardlessOfTimeAndKeepsIndividualDetails() {

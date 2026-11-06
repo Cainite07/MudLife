@@ -77,16 +77,16 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     }
     val loginSchool = { school.launch(Intent(activity, SchoolActivity::class.java)); Unit }
     val openRecharge = { featureBack = tab; if (campus.session.pendingCheckout.isNotBlank()) pending = true else page = "recharge" }
-    DisposableEffect(lifecycle, campus) {
+    DisposableEffect(lifecycle, campus, life) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> { foreground = true; campus.resume() }
+                Lifecycle.Event.ON_RESUME -> { foreground = true; campus.resume(); life.validateQzhqSession() }
                 Lifecycle.Event.ON_PAUSE -> { foreground = false; campus.pause() }
                 else -> Unit
             }
         }
         lifecycle.addObserver(observer)
-        if (foreground) campus.resume()
+        if (foreground) { campus.resume(); life.validateQzhqSession() }
         onDispose { lifecycle.removeObserver(observer); campus.pause() }
     }
     LaunchedEffect(loggedIn, phone) { if (loggedIn) life.initManagers(activity.applicationContext) }
@@ -102,6 +102,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             tab in setOf(1, 2) && System.currentTimeMillis() - campus.updatedAt > 60000 -> campus.refresh()
         }
     }
+    LaunchedEffect(page) { if (page == "accounts" || page == "setup") life.validateQzhqSession() }
     LaunchedEffect(page, campus.config?.feeItem) { if (page == "recharge") campus.loadRechargeRules() }
     DisposableEffect(codeVisible, foreground, campus.brightCode) {
         val enabled = codeVisible && foreground && campus.brightCode
@@ -141,7 +142,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
                     PageTitle(when (page) { "bath" -> "洗浴使用码"; "dryer" -> "吹风机使用码"; else -> "使用码" }, back = { page = codesBack })
                     UserScreen(phone, onLogout = {}, viewModel = life, codesOnly = true, codeKind = if (page == "codes") "all" else page, onLifeLogin = loginLife)
                 }
-                page == "accounts" || page == "setup" -> AccountPage(loggedIn, life.isQzhqLoggedIn, campus.hasSession, campus.needsLogin,
+                page == "accounts" || page == "setup" -> AccountPage(loggedIn, life.isQzhqLoggedIn, campus.hasSession, campus.needsLogin, life.qzhqSessionExpired,
                     setup = page == "setup", back = back, finish = finishSetup, select = {
                         when {
                             it == "school" && (!campus.hasSession || campus.needsLogin) -> loginSchool()
@@ -191,17 +192,17 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     if (account.isNotEmpty()) {
         val selected = account
         val connected = when (selected) { "school" -> campus.hasSession; "life" -> loggedIn; else -> life.isQzhqLoggedIn }
-        val title = when (selected) { "school" -> "学校账号"; "life" -> "趣智校园"; else -> "趣智热水后勤" }
+        val title = when (selected) { "school" -> "学校账号"; "life" -> "趣智校园"; else -> "趣智后勤热水" }
         AlertDialog(onDismissRequest = { account = "" }, title = { Text(title) }, text = {
             Column {
-                Text(if (connected) "已登录" else "未登录", color = AppColors.TextSecondary)
+                Text(if (selected == "logistics" && life.qzhqSessionExpired) "登录已失效" else if (connected) "已登录" else "未登录", color = AppColors.TextSecondary)
                 if (selected != "school" && connected) TextButton(onClick = { tap()
                     codesBack = page; page = "codes"; account = ""
                 }) { Text("使用码") }
                 TextButton(onClick = { tap()
                     account = ""
                     when (selected) { "school" -> loginSchool(); "life" -> loginLife(); else -> logisticsLogin = true }
-                }) { Text(if (connected) "重新登录" else "登录") }
+                }) { Text(if (connected || (selected == "logistics" && life.qzhqSessionExpired)) "重新登录" else "登录") }
                 if (connected) TextButton(onClick = { tap(); account = ""; logout = selected }) { Text("退出登录", color = AppColors.Danger) }
             }
         }, confirmButton = { TextButton(onClick = { tap(); account = "" }) { Text("关闭") } })
@@ -381,7 +382,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
 
 @Composable private fun SectionLabel(text: String) { Text(text, fontSize = 12.sp, color = AppColors.TextSecondary, modifier = Modifier.padding(start = 14.dp, top = 20.dp, bottom = 8.dp)) }
 
-@Composable private fun AccountPage(life: Boolean, logisticsLoggedIn: Boolean, school: Boolean, schoolExpired: Boolean,
+@Composable private fun AccountPage(life: Boolean, logisticsLoggedIn: Boolean, school: Boolean, schoolExpired: Boolean, logisticsExpired: Boolean,
     setup: Boolean, back: () -> Unit, finish: () -> Unit, select: (String) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp)) {
         PageTitle(if (setup) "欢迎使用江大生活" else "账号管理", if (setup) null else back, false)
@@ -391,7 +392,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             HorizontalDivider(color = AppColors.Border.copy(alpha = .5f))
             AccountRow("趣智校园", "饮水机 · 吹风机使用码", Icons.Outlined.WaterDrop, life) { select("life") }
             HorizontalDivider(color = AppColors.Border.copy(alpha = .5f))
-            AccountRow("趣智热水后勤", "洗浴使用码", Icons.Outlined.Shower, logisticsLoggedIn) { select("logistics") }
+            AccountRow("趣智后勤热水", "洗浴使用码", Icons.Outlined.Shower, logisticsLoggedIn, logisticsExpired) { select("logistics") }
         }
         if (setup) {
             Button(onClick = finish, modifier = Modifier.fillMaxWidth().padding(top = 24.dp), shape = RoundedCornerShape(14.dp)) {

@@ -82,8 +82,9 @@ object CampusBillLedger {
         }.distinctBy(BillLedger::key).sortedByDescending { UnifiedLedger.normalizeTime(it.time) }
 
     fun expense(records: List<Bill>): Long? = runCatching {
-        if (records.any { BillLedger.direction(it).isBlank() }) return null
-        records.filter { BillLedger.direction(it) == "2" }.fold(0L) { total, bill ->
+        val confirmed = records.filterNot(DeviceExpenses::pending)
+        if (confirmed.any { BillLedger.direction(it).isBlank() }) return null
+        confirmed.filter { BillLedger.direction(it) == "2" }.fold(0L) { total, bill ->
             val fen = bill.fen ?: return null
             require(fen != Long.MIN_VALUE)
             Math.addExact(total, kotlin.math.abs(fen))

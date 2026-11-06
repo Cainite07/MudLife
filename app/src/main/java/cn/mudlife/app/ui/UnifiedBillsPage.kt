@@ -42,17 +42,34 @@ import cn.mudlife.campuscard.*
     var limit by remember(period, category, campus.currentCard?.account) { mutableIntStateOf(50) }
     val devices = life.deviceBills
     val deviceMonth = month ?: java.time.YearMonth.now()
-    LaunchedEffect(deviceMonth, lifeLoggedIn) { devices.load(deviceMonth) }
+    LaunchedEffect(deviceMonth, lifeLoggedIn) {
+        devices.attach(context)
+        devices.load(deviceMonth)
+    }
+    val earliestSchoolMonth = remember(campus.allBills) { BillLedger.months(campus.allBills).minOrNull() }
+    LaunchedEffect(lifeLoggedIn, earliestSchoolMonth) {
+        if (lifeLoggedIn) {
+            devices.attach(context)
+            devices.syncHistory(earliestSchoolMonth)
+        }
+    }
     val deviceRecords = if (lifeLoggedIn) devices.records.values.flatten() else emptyList()
     val combined = remember(campus.allBills, deviceRecords) { DeviceExpenses.merge(campus.allBills, deviceRecords) }
     val monthRows = remember(combined, month) { CampusBillLedger.select(combined, month) }
     val rows = remember(monthRows, category) { monthRows.filter { category == CampusBillCategory.ALL || CampusBillLedger.category(it) == category } }
     val displayRows = remember(rows) { DeviceExpenses.rows(rows) }
     val months = remember(combined, month) { (BillLedger.months(combined) + listOfNotNull(month)).distinct().sortedDescending() }
-    val devicesComplete = !lifeLoggedIn || (month != null && month in devices.records && deviceMonth !in devices.errors && deviceMonth !in devices.loading)
-    val expense = if ((!campus.hasSession || campus.billsComplete) && devicesComplete) CampusBillLedger.expense(monthRows) else null
+    val devicesComplete = !lifeLoggedIn || if (month == null) devices.historyComplete &&
+        months.all { it >= devices.historyStart!! && devices.monthComplete(it) } else devices.monthComplete(month)
+    val complete = (!campus.hasSession || campus.billsComplete) && devicesComplete
+    // Across months, show the known records explicitly as a synced subtotal.
+    val expense = when {
+        month == null && monthRows.isNotEmpty() -> CampusBillLedger.expense(monthRows)
+        complete -> CampusBillLedger.expense(monthRows)
+        else -> null
+    }
     var expandedWater by rememberSaveable(owner, period, PrefsHelper.userId) { mutableStateOf(emptyList<String>()) }
-    val refreshing = campus.billSyncBusy || campus.busy || deviceMonth in devices.loading
+    val refreshing = campus.billSyncBusy || campus.busy || deviceMonth in devices.foregroundLoading
     val pull = rememberPullRefreshState(refreshing, {
         if (campus.needsLogin && !lifeLoggedIn) schoolLogin() else {
             if (campus.hasSession && !campus.needsLogin) { campus.refresh(); campus.refreshBills() }
@@ -77,7 +94,7 @@ import cn.mudlife.campuscard.*
                             }
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text(if (month == null) "累计支出" else "本月支出", fontSize = 11.sp, color = AppColors.TextSecondary)
+                            Text(if (month == null) "支出合计" else "本月支出", fontSize = 11.sp, color = AppColors.TextSecondary)
                             Text(expense?.let { "¥ ${Money.yuan(it)}" } ?: "— —", fontSize = 22.sp, fontWeight = FontWeight.Medium)
                         }
                     }
@@ -94,7 +111,7 @@ import cn.mudlife.campuscard.*
                     if (lifeLoggedIn && deviceMonth in devices.errors) TextButton(onClick = { tap(); devices.load(deviceMonth, force = true) }) {
                         Text(devices.errors.getValue(deviceMonth), fontSize = 12.sp)
                     }
-                    if (lifeLoggedIn && month == null) Text("饮水与吹风机记录按月同步，请选择月份查看完整支出", fontSize = 12.sp, color = AppColors.TextSecondary)
+
                 }
                 displayRows.take(limit).groupBy { it.day }.forEach { (day, entries) ->
                     item(key = "day:$day") { Text(day, fontSize = 12.sp, color = AppColors.TextSecondary,
@@ -153,7 +170,7 @@ import cn.mudlife.campuscard.*
         }
         Column(Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(bill.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Text("${kind.label} · ${bill.time.drop(11).take(5)}", fontSize = 11.sp, color = AppColors.TextSecondary)
+            Text("${kind.label} · ${bill.time.drop(11).take(5)}${if (DeviceExpenses.pending(bill)) " · 待核实" else ""}", fontSize = 11.sp, color = AppColors.TextSecondary)
         }
         Text(bill.displayAmount, fontSize = 15.sp, color = if (BillLedger.direction(bill) == "1") AppColors.TextSecondary else AppColors.TextPrimary)
     }

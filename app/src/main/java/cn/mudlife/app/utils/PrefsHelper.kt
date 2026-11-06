@@ -122,7 +122,8 @@ object PrefsHelper {
         qzhqPhone.ifEmpty { telephone }, qzhqProjectId
     )
     var qzhqStatus: Int get() = prefs.getInt("qzhqStatus", 1); set(v) = prefs.edit().putInt("qzhqStatus", v).apply()
-    val isQzhqLoggedIn: Boolean get() = qzhqLoginCode.isNotEmpty()
+    var qzhqSessionExpired: Boolean get() = prefs.getBoolean("qzhqSessionExpired", false); set(v) = prefs.edit().putBoolean("qzhqSessionExpired", v).apply()
+    val isQzhqLoggedIn: Boolean get() = qzhqLoginCode.isNotEmpty() && !qzhqSessionExpired
 
     fun saveAuth(lc: String, uid: String, aid: String, pid: String, phone: String, name: String?, sno: String? = null) {
         if (telephone.isNotBlank() && telephone != phone) clearLifeAccount()
@@ -148,7 +149,7 @@ object PrefsHelper {
             "boundRoom", "recentDevices", "activeOrders", "projectAccounts",
             // 后勤专区凭证
             "qzhqLoginCode", "qzhqPhone", "qzhqProjectId",
-            "qzhqRandomCode", "qzhqCustomCode", "qzhqStatus",
+            "qzhqRandomCode", "qzhqCustomCode", "qzhqStatus", "qzhqSessionExpired",
             // 校园卡与吹风机
             "campusCardBalance", "campusCardBalanceTime", "useCode", "useCodeStatus", "useCodeLastConfirmedAt"
         ).forEach { editor.remove(it) }

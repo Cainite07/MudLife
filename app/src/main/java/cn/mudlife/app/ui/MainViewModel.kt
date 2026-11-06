@@ -135,6 +135,8 @@ class MainViewModel(
             )
         } else null
     )
+    var qzhqSessionExpired by mutableStateOf(PrefsHelper.qzhqSessionExpired)
+        private set
     var isQzhqLoggedIn by mutableStateOf(PrefsHelper.isQzhqLoggedIn)
     var qzhqLoading by mutableStateOf(false)
     var qzhqPrefix by mutableStateOf(PrefsHelper.qzhqCustomCode)
@@ -1155,11 +1157,37 @@ class MainViewModel(
     }
 
     // ── 后勤洗浴使用码控制 (江大专区) ──
+    private var bathValidationJob: Job? = null
+    private var bathCheckedAt = 0L
+
+    init {
+        viewModelScope.launch {
+            cn.mudlife.app.api.QzhqNetwork.invalidSessions.collect { token ->
+                if (token.isNotBlank() && token == PrefsHelper.qzhqLoginCode && PrefsHelper.qzhqSessionExpired) {
+                    qzhqSessionExpired = true
+                    isQzhqLoggedIn = false
+                    qzhqUseCodeData = null
+                }
+            }
+        }
+    }
+
+    fun validateQzhqSession() {
+        if (!PrefsHelper.isQzhqLoggedIn || bathValidationJob?.isActive == true) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (bathCheckedAt != 0L && now - bathCheckedAt < 60_000L) return
+        bathCheckedAt = now
+        bathValidationJob = loadQzhqUseCode()
+    }
+
     fun logoutQzhq() {
         bathRequests.invalidate(); bathLoginJob?.cancel(); qzhqLoading = false
         PrefsHelper.qzhqLoginCode = ""
         PrefsHelper.qzhqRandomCode = ""
         isQzhqLoggedIn = false
+        qzhqSessionExpired = false
+        PrefsHelper.qzhqSessionExpired = false
+        bathCheckedAt = 0L
         qzhqUseCodeData = null
         qzhqPrefix = ""
     }
@@ -1178,11 +1206,11 @@ class MainViewModel(
                     saveBathCode(resp.data)
                     qzhqUseCodeData = resp.data
                     qzhqPrefix = PrefsHelper.qzhqCustomCode
-                } else if (resp.errorCode == 8 || resp.errorCode == 401) {
+                } else if (resp.isSessionExpired) {
                     qzhqLoading = false
                     isQzhqLoggedIn = false
-                    PrefsHelper.qzhqLoginCode = ""
-                    toastMessage = "后勤账号登录失效，请重新登录"
+                    qzhqSessionExpired = true
+                    qzhqUseCodeData = null
                 }
             } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {
             } finally {
@@ -1266,6 +1294,8 @@ class MainViewModel(
                 if (resp.isSuccess && resp.data != null) {
                     bathRequests.invalidate()
                     isQzhqLoggedIn = true
+                    qzhqSessionExpired = false
+                    bathCheckedAt = 0L
                     loadQzhqUseCode()
                     toastMessage = "后勤专区登录成功，已同步洗澡码"
                     onComplete(true, "登录成功")
@@ -1290,6 +1320,8 @@ class MainViewModel(
                 if (resp.isSuccess && resp.data != null) {
                     bathRequests.invalidate()
                     isQzhqLoggedIn = true
+                    qzhqSessionExpired = false
+                    bathCheckedAt = 0L
                     loadQzhqUseCode()
                     toastMessage = "后勤专区登录成功，已同步洗澡码"
                     onComplete(true, "登录成功")
