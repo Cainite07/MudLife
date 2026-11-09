@@ -42,7 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -58,9 +58,18 @@ import cn.mudlife.app.utils.PrefsHelper
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
-fun MainScreen(phone: String, viewModel: MainViewModel = viewModel(), onUseCodes: () -> Unit = {}) {
+fun MainScreen(
+    phone: String,
+    viewModel: MainViewModel = viewModel(),
+    onUseCodes: () -> Unit = {},
+    onCampusRefresh: (() -> Unit)? = null,
+    campusServices: (@Composable (onScan: () -> Unit) -> Unit)? = null,
+    pageInsets: PaddingValues? = null
+) {
     val context = LocalContext.current
     val appContext = LocalContext.current.applicationContext
+    val direction = LocalLayoutDirection.current
+    val safeArea = pageInsets ?: PaddingValues(0.dp)
 
     // 扫码绑定设备
     val scanLauncher = rememberLauncherForActivityResult(
@@ -76,51 +85,57 @@ fun MainScreen(phone: String, viewModel: MainViewModel = viewModel(), onUseCodes
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.refreshWallet()
+    LaunchedEffect(viewModel, phone) {
+        if (campusServices != null) viewModel.refreshWalletOnHomeEntry() else viewModel.refreshWallet()
         viewModel.initManagers(appContext)
     }
 
     val pullRefreshing = viewModel.isRefreshing
     val pullState = rememberPullRefreshState(
         refreshing = pullRefreshing,
-        onRefresh = viewModel::pullRefresh
+        onRefresh = {
+            viewModel.pullRefresh()
+            onCampusRefresh?.invoke()
+        }
     )
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
-            containerColor = AppColors.Background
+            containerColor = AppColors.Background,
+            contentWindowInsets = if (pageInsets == null) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0)
         ) { padding ->
             if (viewModel.isShowering) {
-                ShowerScreen(
-                    emoji = viewModel.selectedDevice?.typeEmoji ?: "🚿",
-                    statusText = viewModel.selectedDevice?.statusText ?: "正在沐浴中",
-                    location = viewModel.selectedDevice?.locationOnly ?: "",
-                    remaining = viewModel.showerRemaining,
-                    elapsedSec = viewModel.showerElapsedSec,
-                    autoDisConSec = viewModel.autoDisConSec,
-                    isStopping = viewModel.isStopping,
-                    onStopClick = { viewModel.stopShower() }
-                )
+                Box(Modifier.fillMaxSize().padding(safeArea)) {
+                    ShowerScreen(
+                        emoji = viewModel.selectedDevice?.typeEmoji ?: "🚿",
+                        statusText = viewModel.selectedDevice?.statusText ?: "正在沐浴中",
+                        location = viewModel.selectedDevice?.locationOnly ?: "",
+                        remaining = viewModel.showerRemaining,
+                        elapsedSec = viewModel.showerElapsedSec,
+                        autoDisConSec = viewModel.autoDisConSec,
+                        isStopping = viewModel.isStopping,
+                        onStopClick = { viewModel.stopShower() }
+                    )
+                }
             } else {
-                Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+                Box(modifier = Modifier.padding(padding).fillMaxSize().padding(
+                    start = safeArea.calculateStartPadding(direction), end = safeArea.calculateEndPadding(direction)
+                )) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize().pullRefresh(pullState).padding(horizontal = 22.dp),
-                        contentPadding = PaddingValues(bottom = 24.dp),
+                        contentPadding = PaddingValues(top = safeArea.calculateTopPadding(),
+                            bottom = 24.dp + safeArea.calculateBottomPadding()),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        item { HomePageHeader() }
                         item {
-                            Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("江大生活", fontFamily = FontFamily.Serif, fontSize = 27.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
-                                Text(java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M月d日 · E", java.util.Locale.CHINA)), fontSize = 11.sp, color = AppColors.TextSecondary)
-                            }
-                        }
-                        item {
-                            Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                HomeQuickAction("扫码出水", Icons.Outlined.QrCodeScanner, true, Modifier.weight(1f)) {
-                                    scanLauncher.launch(Intent(context, QrScanActivity::class.java))
+                            val onScan = { scanLauncher.launch(Intent(context, QrScanActivity::class.java)) }
+                            if (campusServices != null) campusServices(onScan)
+                            else {
+                                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    HomeQuickAction("扫码出水", Icons.Outlined.QrCodeScanner, true, Modifier.weight(1f), onScan)
+                                    HomeQuickAction("使用码", Icons.Outlined.Key, false, Modifier.weight(1f), onUseCodes)
                                 }
-                                HomeQuickAction("使用码", Icons.Outlined.Key, false, Modifier.weight(1f), onUseCodes)
                             }
                         }
 
@@ -178,7 +193,7 @@ fun MainScreen(phone: String, viewModel: MainViewModel = viewModel(), onUseCodes
                     PullRefreshIndicator(
                         refreshing = pullRefreshing,
                         state = pullState,
-                        modifier = Modifier.align(Alignment.TopCenter),
+                        modifier = Modifier.align(Alignment.TopCenter).offset(y = safeArea.calculateTopPadding()),
                         backgroundColor = AppColors.Card,
                         contentColor = AppColors.Accent
                     )

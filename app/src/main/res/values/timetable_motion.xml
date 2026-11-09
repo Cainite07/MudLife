@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TimetablePageWindowMotion" parent="@android:style/Animation">
+        <item name="android:windowEnterAnimation">@anim/timetable_window_enter</item>
+        <item name="android:windowExitAnimation">@anim/timetable_window_exit</item>
+    </style>
+</resources>

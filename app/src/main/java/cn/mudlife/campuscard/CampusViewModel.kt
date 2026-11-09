@@ -90,15 +90,17 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refresh() {
         if (busy || !session.hasSession) return
+        val requestToken = authenticatedToken
         busy = true
         viewModelScope.launch {
             try {
                 val freshConfig = api.config()
                 val freshCards = api.cards()
-                config = freshConfig; cards = freshCards
                 val previousAccount = selected
-                selected = freshCards.find { it.account == selected }?.account ?: freshCards.firstOrNull()?.account.orEmpty()
-                session.selectedAccount = selected
+                val card = freshCards.find { it.account == selected } ?: freshCards.firstOrNull()
+                val account = card?.account.orEmpty()
+                if (!session.selectAccount(requestToken, account, card)) return@launch
+                config = freshConfig; cards = freshCards; selected = account
                 if (previousAccount != selected) { resetBills(); billMonth = BillPeriodPolicy.restore(session.billPeriod) }
                 favorites = readFavorites()
                 hasSession = true; needsLogin = false; error = null; updatedAt = System.currentTimeMillis()
@@ -121,7 +123,8 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
         hasSession = session.hasSession; needsLogin = false; refresh()
     }
     fun selectCard(account: String) {
-        selected = account; session.selectedAccount = account; hideCode(); methods = emptyList(); identity = null
+        if (!session.selectAccount(authenticatedToken, account, cards.find { it.account == account })) return
+        selected = account; hideCode(); methods = emptyList(); identity = null
         resetBills(); billMonth = BillPeriodPolicy.restore(session.billPeriod); favorites = readFavorites(); electricLoaded = false; electricSelected = List(3) { null }; electricResult = null
     }
     fun selectMethod(id: String) { selectedMethod = id; generateCode() }

@@ -1,6 +1,7 @@
 package cn.mudlife.app.ui
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,8 @@ class MainViewModel(
 ) : ViewModel() {
 
     var walletInfo by mutableStateOf<WalletData?>(null)
+    private var lastWalletOwner: String? = null
+    private var lastWalletRequestAt = 0L
 
     var isShowering by mutableStateOf(false)
     var isStartingShower by mutableStateOf(false)
@@ -831,6 +834,7 @@ class MainViewModel(
 
     fun logout() {
         deviceBills.clear()
+        lastWalletOwner = null
         accountGeneration++
         lifeRequests.invalidate()
         refreshGeneration++; refreshJob?.cancel(); isRefreshing = false
@@ -922,7 +926,14 @@ class MainViewModel(
         refreshWallet(); loadUseCode()
     }
 
+    fun refreshWalletOnHomeEntry() {
+        if (lastWalletOwner == PrefsHelper.userId && SystemClock.elapsedRealtime() - lastWalletRequestAt < 60_000L) return
+        refreshWallet()
+    }
+
     fun refreshWallet(): Job {
+        lastWalletOwner = PrefsHelper.userId
+        lastWalletRequestAt = SystemClock.elapsedRealtime()
         return lifeRequests.launch {
             try {
                 val resp = request { NetworkModule.apiService.getWalletSafe() }

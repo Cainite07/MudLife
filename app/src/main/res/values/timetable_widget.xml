@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="timetable_widget_name">今日课表</string>
+    <string name="timetable_widget_description">查看今天的课程、时间和教室</string>
+    <string name="timetable_widget_more">另%1$d门</string>
+    <dimen name="tt_widget_vertical_padding">6dp</dimen>
+    <dimen name="tt_widget_header_height">35sp</dimen>
+    <dimen name="tt_widget_rule_height">1dp</dimen>
+    <dimen name="tt_widget_row_height">43sp</dimen>
+    <color name="tt_widget_paper">#FFFDF8</color>
+    <color name="tt_widget_ink">#292F2B</color>
+    <color name="tt_widget_accent">#344E43</color>
+    <color name="tt_widget_detail">#535E55</color>
+    <color name="tt_widget_rail">#E8ECE3</color>
+    <color name="tt_widget_rule">#DFE3D8</color>
+    <style name="TimetableWidgetText">
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+    <style name="TimetableWidgetHeading" parent="TimetableWidgetText">
+        <item name="android:textColor">@color/tt_widget_accent</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+    <style name="TimetableWidgetDate" parent="TimetableWidgetText">
+        <item name="android:textColor">@color/tt_widget_detail</item>
+        <item name="android:textSize">11sp</item>
+    </style>
+    <style name="TimetableWidgetCourse" parent="TimetableWidgetText">
+        <item name="android:textColor">@color/tt_widget_ink</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">15.5sp</item>
+    </style>
+    <style name="TimetableWidgetDetail" parent="TimetableWidgetText">
+        <item name="android:textColor">@color/tt_widget_detail</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:ellipsize">middle</item>
+    </style>
+</resources>

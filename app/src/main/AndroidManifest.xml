@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -15,6 +16,7 @@
     <queries><package android:name="com.tencent.mm" /></queries>
 
     <application
+        android:name=".timetable.MudLifeApplication"
         android:networkSecurityConfig="@xml/network_security_config"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -45,6 +47,20 @@
             android:screenOrientation="portrait" />
 
         <activity android:name="cn.mudlife.campuscard.SchoolActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+
+        <activity android:name=".timetable.TimetableActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".timetable.TimetableImportActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <receiver android:name=".timetable.TodayTimetableWidget" android:exported="false" android:label="@string/timetable_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/today_timetable_widget" />
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

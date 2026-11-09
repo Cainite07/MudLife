@@ -15,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,7 +28,8 @@ import cn.mudlife.app.utils.PrefsHelper
 import cn.mudlife.campuscard.*
 
 @OptIn(ExperimentalMaterialApi::class)
-@Composable internal fun UnifiedBillsPage(campus: CampusViewModel, life: MainViewModel, lifeLoggedIn: Boolean, schoolLogin: () -> Unit, recharge: () -> Unit) {
+@Composable internal fun UnifiedBillsPage(campus: CampusViewModel, life: MainViewModel, lifeLoggedIn: Boolean, schoolLogin: () -> Unit,
+    recharge: () -> Unit, pageInsets: PaddingValues = PaddingValues(0.dp)) {
     val context = LocalContext.current
     val tap = { HapticHelper.tick(context) }
     // Preserve the month stored by the previous combined statement.
@@ -76,8 +78,11 @@ import cn.mudlife.campuscard.*
             devices.load(deviceMonth, force = true)
         }
     })
+    val direction = LocalLayoutDirection.current
     Box(Modifier.fillMaxSize().pullRefresh(pull)) {
-        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 22.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(
+            start = 22.dp + pageInsets.calculateStartPadding(direction), end = 22.dp + pageInsets.calculateEndPadding(direction),
+            top = pageInsets.calculateTopPadding(), bottom = 24.dp + pageInsets.calculateBottomPadding())) {
             item(key = "title") { PageTitle("账单", padded = false) }
             item(key = "balance") { CampusBalance(campus, schoolLogin, recharge) }
             if (campus.hasSession || lifeLoggedIn) {
@@ -143,7 +148,8 @@ import cn.mudlife.campuscard.*
                     color = AppColors.TextSecondary, modifier = Modifier.padding(vertical = 28.dp)) }
             }
         }
-        PullRefreshIndicator(refreshing, pull, Modifier.align(Alignment.TopCenter), backgroundColor = AppColors.Card)
+        PullRefreshIndicator(refreshing, pull, Modifier.align(Alignment.TopCenter).padding(top = pageInsets.calculateTopPadding()),
+            backgroundColor = AppColors.Card)
     }
     detail?.let { bill -> AlertDialog(onDismissRequest = { detail = null }, title = { Text(bill.title) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

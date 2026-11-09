@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tt_widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center" android:background="@drawable/today_timetable_background"
+    android:paddingHorizontal="9dp" android:paddingVertical="@dimen/tt_widget_vertical_padding">
+    <LinearLayout android:id="@+id/tt_widget_header" android:layout_width="match_parent" android:layout_height="@dimen/tt_widget_header_height"
+        android:gravity="center" android:orientation="vertical">
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center"
+            android:orientation="horizontal" android:baselineAligned="false">
+            <TextView style="@style/TimetableWidgetHeading" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/timetable_widget_name" />
+            <TextView android:id="@+id/tt_widget_more" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="5dp" android:paddingHorizontal="5dp" android:includeFontPadding="false"
+                android:background="@drawable/today_timetable_period_badge" android:fontFamily="sans-serif-medium"
+                android:singleLine="true" android:visibility="gone" android:textSize="11sp" android:textColor="@color/tt_widget_accent" />
+        </LinearLayout>
+        <TextView android:id="@+id/tt_widget_date" style="@style/TimetableWidgetDate"
+            android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <TextView android:layout_width="32dp" android:layout_height="@dimen/tt_widget_rule_height" android:background="@color/tt_widget_rule" />
+    <LinearLayout android:id="@+id/tt_widget_rows" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" />
+    <TextView android:id="@+id/tt_widget_empty" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:minHeight="@dimen/tt_widget_row_height" android:gravity="center" android:textColor="@color/tt_widget_detail"
+        android:textSize="14sp" android:text="正在读取课表…" />
+</LinearLayout>

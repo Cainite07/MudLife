@@ -12,12 +12,14 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
+import android.os.SystemClock
 import android.webkit.*
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontFamily
@@ -48,6 +50,25 @@ class SchoolActivity : ComponentActivity() {
     private var reconciling by mutableStateOf(false)
     private var reconciliationJob: Job? = null
     private var authFinished = false
+    private val cardLogin get() = !payment
+    private var loginPhase by mutableStateOf("连接校园卡入口")
+    private var phaseSince = SystemClock.elapsedRealtime()
+    private var phaseSeconds by mutableIntStateOf(0)
+    private enum class CardPage(val message: String) {
+        LOADING("正在加载校园卡网页"),
+        EMPTY("校园卡网页已载入，暂未显示内容"),
+        VISIBLE("校园卡网页已打开，正在确认登录")
+    }
+    private var cardPage by mutableStateOf<CardPage?>(null)
+    private var cardAssetFailed by mutableStateOf(false)
+    private var observedEmptyCard by mutableStateOf(false)
+    private lateinit var recovery: CardLoginRecovery
+    private var sawReturnInDocument = false
+    private var resourceCount = -1
+    private var manualRecovery by mutableStateOf(false)
+    private var loginWatch: Job? = null
+    private var loginGeneration = 0
+    private var awaitingCheck = false
     private var checks = 0
     private var referer = SchoolApi.ORIGIN + "/"
     private var active = false
@@ -68,6 +89,7 @@ class SchoolActivity : ComponentActivity() {
         quantity = intent.getStringExtra("quantity").orEmpty()
         fen = intent.getLongExtra("fen", 0)
         if (fen <= 0 && session.pendingCheckout.isNotBlank()) fen = session.pendingFen
+        if (cardLogin) recovery = CardLoginRecovery(state?.getBoolean("cardAutomaticRecovery") == true)
         account = intent.getStringExtra("account").orEmpty()
         target = intent.getStringExtra("target").orEmpty()
         creationStarted = state?.getBoolean("creationStarted") ?: false
@@ -84,9 +106,26 @@ class SchoolActivity : ComponentActivity() {
                         Text(if (electric) "电费充值" else if (payment) "校园卡充值" else "学校认证", fontFamily = FontFamily.Serif, fontSize = 19.sp, modifier = Modifier.weight(1f).padding(top = 11.dp))
                     }
                     if (!payment) {
-                        Text("认证成功后会安全记住登录", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 24.dp, bottom = 12.dp))
-                        if (failure) { Text(stage, Modifier.padding(24.dp)); TextButton(onClick = { failure = false; browser.loadUrl(loginUrl()) }) { Text("重新连接") } }
-                        else AndroidView(factory = { browser }, modifier = Modifier.fillMaxWidth().weight(1f))
+                        if (cardLogin) {
+                            val message = if (cardAssetFailed && cardPage != CardPage.VISIBLE) "校园卡网页资源加载失败" else cardPage?.message ?: loginPhase
+                            Text("$message · 已停留 ${phaseSeconds} 秒", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 24.dp, bottom = 8.dp))
+                            if (cardPage == CardPage.LOADING && !failure && !cardAssetFailed)
+                                LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp))
+                            if (failure || manualRecovery)
+                                TextButton(onClick = ::continueCardLogin, modifier = Modifier.padding(start = 12.dp)) { Text("重新连接校园卡") }
+                        } else Text("认证成功后会安全记住登录", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 24.dp, bottom = 12.dp))
+                        if (failure) { Text(stage, Modifier.padding(24.dp)); if (!cardLogin) TextButton(onClick = { failure = false; browser.loadUrl(loginUrl()) }) { Text("重新连接") } }
+                        else Box(Modifier.fillMaxWidth().weight(1f)) {
+                            AndroidView(factory = { browser }, modifier = Modifier.fillMaxSize())
+                            if (cardLogin && observedEmptyCard && phaseSeconds >= 3 && !manualRecovery) {
+                                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 2.dp)
+                                    Text(if (recovery.automaticAttempted) "已自动重新连接，正在等待校园卡"
+                                        else "正在等待校园卡", Modifier.padding(top = 12.dp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
                     } else {
                         AndroidView(factory = { browser }, modifier = Modifier.size(1.dp).alpha(0f))
                         Column(Modifier.fillMaxWidth().padding(24.dp)) {
@@ -142,6 +181,15 @@ class SchoolActivity : ComponentActivity() {
                 if (payment && Navigation.wechat(url)) { view.stopLoading(); openWechat(url!!); return }
                 if (!Navigation.web(url)) { view.stopLoading(); fail("学校页面暂时无法打开"); return }
                 val uri = Uri.parse(url)
+                if (cardLogin) {
+                    loginGeneration++
+                    awaitingCheck = false
+                    resetCardObservation()
+                    sawReturnInDocument = isLoginTransit(uri)
+                    phaseSince = SystemClock.elapsedRealtime()
+                    phaseSeconds = 0
+                    updateLoginPhase(uri)
+                }
                 if (uri.host in setOf("ykt.ujs.edu.cn", "ecardpay.ujs.edu.cn")) referer = "https://${uri.host}/"
                 if (payment && Navigation.checkout(url)) { session.pendingCheckout = url!!; session.pendingOrderId = Navigation.checkoutReference(url)?.orderId.orEmpty(); creationStarted = true; checks = 0 }
                 handler.removeCallbacksAndMessages(null)
@@ -149,15 +197,27 @@ class SchoolActivity : ComponentActivity() {
             override fun onPageFinished(view: WebView, url: String?) {
                 if (failure || isFinishing || isDestroyed || !Navigation.web(url)) return
                 val u = Uri.parse(url)
-                if (!payment && u.host == "ykt.ujs.edu.cn" && u.path?.startsWith("/plat/") == true && u.path != "/plat/login") collectSession()
+                if (cardLogin) checkCardLogin()
+                else if (!payment && u.host == "ykt.ujs.edu.cn" && u.path?.startsWith("/plat/") == true && u.path != "/plat/login") collectSession()
                 else if (payment && u.host == "ykt.ujs.edu.cn" && u.path?.startsWith("/campus-card/cardRecharge") == true) submitWhenReady()
                 else if (payment && Navigation.checkout(url)) payWhenReady()
                 else if (electric && u.host == "ykt.ujs.edu.cn" && u.path?.startsWith("/charge-app") == true) electricTick()
                 else if (payment && u.host == "pass.ujs.edu.cn") fail("学校要求更新认证，请返回账户页更新登录后再继续")
             }
             override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) { handler.cancel(); fail("学校的安全连接未能确认，请稍后重试") }
-            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) { if (request.isForMainFrame) fail("学校连接暂时不可用，已保留本机登录状态") }
-            override fun onFormResubmission(view: WebView, dontResend: Message, resend: Message) { dontResend.sendToTarget(); fail("已阻止重复提交，请先核对充值记录") }
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (request.isForMainFrame) fail("学校连接暂时不可用，已保留本机登录状态")
+                else noteCardAssetFailure(view, request)
+            }
+            override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
+                if (!cardLogin) return
+                if (request.isForMainFrame) fail("学校页面暂时无法打开（HTTP ${response.statusCode}），已保留本机登录状态")
+                else noteCardAssetFailure(view, request)
+            }
+            override fun onFormResubmission(view: WebView, dontResend: Message, resend: Message) {
+                dontResend.sendToTarget()
+                fail(if (cardLogin) "认证表单已提交，可从校园卡入口继续。" else "已阻止重复提交，请先核对充值记录")
+            }
         }
     }
 
@@ -167,11 +227,160 @@ class SchoolActivity : ComponentActivity() {
             if (authFinished || isFinishing || isDestroyed) return@evaluateJavascript
             val value = decodeResult(raw)?.optString("token").orEmpty()
             if (value.isNotBlank()) {
-                try {
-                    session.save(value); CookieManager.getInstance().flush(); authFinished = true
-                    setResult(RESULT_OK); finish()
-                } catch (_: Exception) { fail("登录成功，但无法安全保存到本机。请稍后重试，未保存账号密码。") }
+                finishSchoolLogin(value)
             } else if (++checks < 40) handler.postDelayed(::collectSession, 500)
+        }
+    }
+
+    private fun finishSchoolLogin(value: String) {
+        try {
+            session.save(value); CookieManager.getInstance().flush(); authFinished = true
+            setResult(RESULT_OK); finish()
+        } catch (_: Exception) { fail("登录成功，但无法安全保存到本机。请稍后重试，未保存账号密码。") }
+    }
+
+    private fun isCardPage(uri: Uri?) = uri?.scheme == "https" && uri.authority == "ykt.ujs.edu.cn" &&
+        (uri.path == "/plat" || uri.path.orEmpty().startsWith("/plat/"))
+
+    // The university's CAS GET below returns to this specific landing page. Other
+    // /plat pages can contain login, challenge or account-switching UI.
+    private fun isReturnRoot(uri: Uri?) = isCardPage(uri) &&
+        uri?.path?.trimEnd('/') == "/plat" && uri.fragment.orEmpty().trim('/') == ""
+
+    private fun isLoginTransit(uri: Uri?) = isReturnRoot(uri) && uri?.getQueryParameter("name") == "loginTransit"
+
+    private fun resetCardObservation() {
+        recovery.resetObservation()
+        cardPage = null
+        observedEmptyCard = false
+        cardAssetFailed = false
+        manualRecovery = false
+        resourceCount = -1
+    }
+
+    private fun noteCardAssetFailure(view: WebView, request: WebResourceRequest) {
+        if (!cardLogin || !isCardPage(view.url?.let(Uri::parse)) || !isCardPage(request.url)) return
+        val filename = request.url.lastPathSegment.orEmpty()
+        // Optional lazy chunks and decorative resources cannot prove the app failed to start.
+        if (filename.substringBefore('.') in setOf("app", "chunk-vendors") &&
+            filename.substringAfterLast('.') in setOf("js", "css")) cardAssetFailed = true
+    }
+
+    private fun updateLoginPhase(uri: Uri?) {
+        val onCard = isCardPage(uri)
+        if (onCard && cardPage == null) cardPage = CardPage.LOADING
+        if (!onCard) {
+            cardPage = null
+            observedEmptyCard = false
+        }
+        val phase = when {
+            uri?.host == "pass.ujs.edu.cn" -> "学校统一身份认证"
+            onCard -> "校园卡页面"
+            uri?.host == "ykt.ujs.edu.cn" -> "校园卡认证跳转"
+            else -> "连接学校服务"
+        }
+        if (phase != loginPhase) {
+            loginPhase = phase
+            phaseSince = SystemClock.elapsedRealtime()
+            phaseSeconds = 0
+        }
+    }
+
+    private fun continueCardLogin() {
+        if (!cardLogin || authFinished) return
+        loginGeneration++
+        awaitingCheck = false
+        browser.stopLoading()
+        failure = false
+        resetCardObservation()
+        sawReturnInDocument = false
+        phaseSince = SystemClock.elapsedRealtime()
+        phaseSeconds = 0
+        loginPhase = "连接校园卡入口"
+        // Use a new GET at the university's normal entry. Never reload a submitted POST.
+        browser.loadUrl(loginUrl())
+    }
+
+    private fun checkCardLogin() {
+        if (!cardLogin || !active || authFinished || failure || isFinishing || isDestroyed) return
+        val uri = browser.url?.let(Uri::parse)
+        if (uri != null) updateLoginPhase(uri)
+        phaseSeconds = ((SystemClock.elapsedRealtime() - phaseSince) / 1000).toInt()
+        if (!isCardPage(uri)) {
+            sawReturnInDocument = false
+            recovery.resetObservation()
+            manualRecovery = false
+            return
+        }
+        if (isLoginTransit(uri)) sawReturnInDocument = true
+        if (!isReturnRoot(uri)) sawReturnInDocument = false
+        if (awaitingCheck) return
+        val page = loginGeneration
+        awaitingCheck = true
+        // Check the campus card's own session after an SPA navigation. The IdP form is never inspected.
+        browser.evaluateJavascript("""(() => {
+            if (location.origin !== 'https://ykt.ujs.edu.cn' || !/^\/plat(?:\/|$)/.test(location.pathname)) return null;
+            const token = sessionStorage.getItem('access_token') || '';
+            if (token) return JSON.stringify({token});
+            // The school can mount verification dialogs outside its main #app element.
+            const area = document.body;
+            const visible = el => (!el.checkVisibility || el.checkVisibility({checkVisibilityCSS:true, checkOpacity:true}))
+                && el.getClientRects().length && el.getBoundingClientRect().height > 1;
+            let content = false;
+            if (area) {
+                // Only use element and text layout, without reading any form values or page text.
+                content = Array.from(area.querySelectorAll('input:not([type=hidden]),textarea,select,button,img,svg,canvas,iframe,a[href],[contenteditable],[role=dialog]'))
+                    .some(visible);
+                if (!content) {
+                    const text = document.createTreeWalker(area, NodeFilter.SHOW_TEXT);
+                    const range = document.createRange();
+                    for (let node = text.nextNode(); node; node = text.nextNode()) {
+                        const el = node.parentElement;
+                        if (!el || el.closest('script,style,noscript,textarea,select,[hidden]') || !visible(el)) continue;
+                        range.selectNodeContents(node);
+                        if (Array.from(range.getClientRects()).some(r => r.width > 1 && r.height > 1)) { content = true; break; }
+                    }
+                }
+            }
+            const root = location.pathname === '/plat' || location.pathname === '/plat/';
+            const safeRoot = root && ['', '#', '#/'].includes(location.hash);
+            return JSON.stringify({content, safeRoot, complete: document.readyState === 'complete',
+                resources: performance.getEntriesByType('resource').length});
+        })()""") { raw ->
+            if (page != loginGeneration) return@evaluateJavascript
+            awaitingCheck = false
+            if (!active || authFinished || failure || isFinishing || isDestroyed) return@evaluateJavascript
+            val result = decodeResult(raw)
+            if (result == null || browser.url?.let(Uri::parse) != uri) {
+                recovery.resetObservation()
+                observedEmptyCard = false
+                manualRecovery = false
+                return@evaluateJavascript
+            }
+            val token = result.optString("token")
+            if (token.isNotBlank()) {
+                finishSchoolLogin(token)
+                return@evaluateJavascript
+            }
+            observedEmptyCard = !result.optBoolean("content")
+            cardPage = when {
+                !observedEmptyCard -> CardPage.VISIBLE
+                result.optBoolean("complete") -> CardPage.EMPTY
+                else -> CardPage.LOADING
+            }
+            val loaded = result.optInt("resources", -1)
+            if (loaded != resourceCount) recovery.resetObservation()
+            resourceCount = loaded
+            val canRecover = sawReturnInDocument && isReturnRoot(uri) && result.optBoolean("safeRoot")
+            val observation = when {
+                !observedEmptyCard -> CardLoginRecovery.Observation.UNCONFIRMED
+                cardAssetFailed -> CardLoginRecovery.Observation.FAILED_REQUIRED_ASSET_EMPTY
+                cardPage == CardPage.EMPTY -> CardLoginRecovery.Observation.COMPLETE_EMPTY
+                else -> CardLoginRecovery.Observation.UNCONFIRMED
+            }
+            val action = recovery.observe(SystemClock.elapsedRealtime(), canRecover, observation)
+            manualRecovery = action == CardLoginRecovery.Action.OFFER_MANUAL
+            if (action == CardLoginRecovery.Action.REOPEN) continueCardLogin()
         }
     }
 
@@ -346,13 +555,42 @@ class SchoolActivity : ComponentActivity() {
         if (::browser.isInitialized) {
             browser.onResume()
             val uri = browser.url?.let(Uri::parse)
-            if (!payment && uri?.host == "ykt.ujs.edu.cn" && uri.path?.startsWith("/plat/") == true && uri.path != "/plat/login") collectSession()
+            if (cardLogin) {
+                loginWatch?.cancel()
+                loginWatch = lifecycleScope.launch {
+                    while (active && !authFinished && !isFinishing) {
+                        checkCardLogin()
+                        delay(1000)
+                    }
+                }
+            }
+            else if (!payment && uri?.host == "ykt.ujs.edu.cn" && uri.path?.startsWith("/plat/") == true && uri.path != "/plat/login") collectSession()
             else if (payment && Navigation.checkout(browser.url)) payWhenReady()
             else if (payment && uri?.path?.startsWith("/campus-card/cardRecharge") == true) submitWhenReady()
             else if (electric && uri?.host == "ykt.ujs.edu.cn" && uri.path?.startsWith("/charge-app") == true) electricTick()
         }
     }
-    override fun onPause() { active = false; reconciliationJob?.cancel(); reconciling = false; if (::browser.isInitialized) { CookieManager.getInstance().flush(); browser.onPause() }; super.onPause() }
-    override fun onSaveInstanceState(outState: Bundle) { outState.putBoolean("creationStarted", creationStarted); outState.putBoolean("payStarted", payStarted); outState.putBoolean("handedToWechat", handedToWechat); outState.putBoolean("paymentConfirmed", paymentConfirmed); super.onSaveInstanceState(outState) }
+    override fun onPause() {
+        active = false
+        if (cardLogin) {
+            loginWatch?.cancel()
+            recovery.resetObservation()
+            observedEmptyCard = false
+            manualRecovery = false
+            loginGeneration++
+            awaitingCheck = false
+        }
+        reconciliationJob?.cancel(); reconciling = false
+        if (::browser.isInitialized) { CookieManager.getInstance().flush(); browser.onPause() }
+        super.onPause()
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        if (cardLogin) outState.putBoolean("cardAutomaticRecovery", recovery.automaticAttempted)
+        outState.putBoolean("creationStarted", creationStarted)
+        outState.putBoolean("payStarted", payStarted)
+        outState.putBoolean("handedToWechat", handedToWechat)
+        outState.putBoolean("paymentConfirmed", paymentConfirmed)
+        super.onSaveInstanceState(outState)
+    }
     override fun onDestroy() { handler.removeCallbacksAndMessages(null); if (::browser.isInitialized) { browser.stopLoading(); browser.destroy() }; super.onDestroy() }
 }

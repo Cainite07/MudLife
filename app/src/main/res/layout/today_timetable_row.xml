@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tt_widget_row" android:layout_width="match_parent" android:layout_height="@dimen/tt_widget_row_height"
+    android:orientation="vertical" android:gravity="center">
+    <TextView android:id="@+id/tt_widget_course" style="@style/TimetableWidgetCourse"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <TextView android:id="@+id/tt_widget_location_time" style="@style/TimetableWidgetDetail"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+</LinearLayout>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+    android:gravity="center" android:background="@drawable/today_timetable_background"
+    android:paddingHorizontal="9dp" android:paddingVertical="@dimen/tt_widget_vertical_padding">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="@dimen/tt_widget_header_height"
+        android:orientation="vertical" android:gravity="center">
+        <TextView style="@style/TimetableWidgetHeading" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/timetable_widget_name" />
+        <TextView style="@style/TimetableWidgetDate" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="9月7日 周一 · 第1周" />
+    </LinearLayout>
+    <TextView android:layout_width="32dp" android:layout_height="@dimen/tt_widget_rule_height" android:background="@color/tt_widget_rule" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="@dimen/tt_widget_row_height"
+        android:orientation="vertical" android:gravity="center">
+        <TextView style="@style/TimetableWidgetCourse" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="大学英语" />
+        <TextView style="@style/TimetableWidgetDetail" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="1–2节 · 08:00–09:40 · 三江楼" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="@dimen/tt_widget_row_height"
+        android:orientation="vertical" android:gravity="center">
+        <TextView style="@style/TimetableWidgetCourse" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="高等数学" />
+        <TextView style="@style/TimetableWidgetDetail" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="5–6节 · 13:30–15:10 · 三山楼" />
+    </LinearLayout>
+</LinearLayout>

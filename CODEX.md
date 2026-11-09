@@ -15,6 +15,7 @@
 | 目录或文件 | 职责 |
 | --- | --- |
 | `app/ui/UnifiedApp.kt` | 主导航、账号入口与主题状态 |
+| `app/timetable/` | 本科教务导入、本地课表、周视图与「今日课表」桌面小组件 |
 | `app/ui/MainViewModel.kt` | 饮水设备、使用码和订单状态 |
 | `app/ui/UnifiedBillsPage.kt` | 校园卡余额、分类账单与饮水折叠明细 |
 | `app/ui/DeviceBillStore.kt` | 按月查询独立设备消费、会话隔离和内存缓存 |

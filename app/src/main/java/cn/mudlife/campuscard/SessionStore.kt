@@ -1,11 +1,14 @@
 package cn.mudlife.campuscard
 
 import android.content.Context
+import android.content.Intent
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import cn.mudlife.app.BuildConfig
 
 /** Passwords and payment codes are never persisted. Network errors never erase login. */
 class SessionStore(context: Context) {
+    private val app = context.applicationContext
     private val preferences = EncryptedSharedPreferences.create(
         context.applicationContext, "school_session",
         MasterKey.Builder(context.applicationContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
@@ -18,11 +21,44 @@ class SessionStore(context: Context) {
     fun saveUnifiedPeriod(owner: String, value: String) { check(preferences.edit().putString("unified_period_$owner", value).commit()) }
     fun save(token: String) {
         require(token.isNotBlank() && token.length <= 16384 && !token.contains('\n'))
-        check(preferences.edit().putString("access_token", token.removePrefix("bearer ")).commit())
+        val next = token.removePrefix("bearer ")
+        synchronized(accountLock) {
+            val edit = preferences.edit().putString("access_token", next)
+            val changed = this.token != next
+            if (changed) edit.remove("timetable_owner")
+            check(edit.commit())
+            if (changed) notifyTimetableWidget()
+        }
     }
-    var selectedAccount: String
+    val selectedAccount: String
         get() = preferences.getString("selected_account", "").orEmpty()
-        set(value) { preferences.edit().putString("selected_account", value).apply() }
+    val timetableOwner: String?
+        get() = synchronized(accountLock) {
+            if (hasSession && selectedAccount.isNotBlank())
+                preferences.getString("timetable_owner", null)
+            else null
+        }
+
+    /** Only the selected card returned by the current authenticated request can establish an owner. */
+    fun selectAccount(expectedToken: String, account: String, verifiedCard: CampusCard?): Boolean {
+        synchronized(accountLock) {
+            if (expectedToken.isBlank() || expectedToken != token) return false
+            val owner = verifiedCard?.takeIf { account.isNotBlank() && it.account == account }
+                ?.number?.trim()?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+            val previous = timetableOwner
+            if (selectedAccount != account || previous != owner) {
+                check(preferences.edit().putString("selected_account", account)
+                    .putString("timetable_owner", owner).commit())
+                if (owner != previous) notifyTimetableWidget()
+            }
+            return true
+        }
+    }
+
+    private fun notifyTimetableWidget() {
+        app.sendBroadcast(Intent("cn.mudlife.app.TIMETABLE_ACCOUNT_CHANGED")
+            .setClassName(app, "cn.mudlife.app.timetable.TodayTimetableWidget"))
+    }
     var pendingCheckout: String
         get() = preferences.getString("pending_checkout", "").orEmpty()
         set(value) { check(preferences.edit().putString("pending_checkout", value).commit()) }
@@ -48,7 +84,23 @@ class SessionStore(context: Context) {
         get() = preferences.getString("pending_order_id", "").orEmpty()
         set(value) { check(preferences.edit().putString("pending_order_id", value).commit()) }
     fun clearPending() { check(preferences.edit().remove("pending_checkout").remove("pending_fen").remove("pending_kind").remove("pending_order_id").commit()) }
-    fun clear() { check(preferences.edit().clear().commit()) }
+    fun clearSchoolAuthentication() {
+        synchronized(accountLock) {
+            check(BuildConfig.DEBUG && pendingCheckout.isBlank())
+            check(preferences.edit().remove("access_token").remove("selected_account").remove("timetable_owner").commit())
+            notifyTimetableWidget()
+        }
+    }
+    fun clear() {
+        synchronized(accountLock) {
+            check(preferences.edit().clear().commit())
+            notifyTimetableWidget()
+        }
+    }
+
+    private companion object {
+        val accountLock = Any()
+    }
 }
 
 object Money {
