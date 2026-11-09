@@ -23,7 +23,7 @@ val LightColors = AppColorSet(
     Card = Color(0xFFFFFDF8),
     SolidSurface = Color(0xFFFFFDF8),
     Primary = Color(0xFF292F2B),
-    Accent = Color(0xFF344E43),
+    Accent = Color(0xFF344E43), OnAccent = Color(0xFFFFFCF4),
     TextPrimary = Color(0xFF292F2B),
     TextSecondary = Color(0xFF777B71),
     Success = Color(0xFF537051), Warning = Color(0xFF98632D),
@@ -32,25 +32,24 @@ val LightColors = AppColorSet(
     isDark = false
 )
 
-// A warm reading palette for the existing dark-mode switch.
 val DarkColors = AppColorSet(
-    Background = Color(0xFF24221C),
-    Card = Color(0xFF302D25),
-    SolidSurface = Color(0xFF353127),
-    Primary = Color(0xFFEDE4D1),
-    Accent = Color(0xFFC4C79C),
-    TextPrimary = Color(0xFFEDE4D1),
-    TextSecondary = Color(0xFFB8AC94),
-    Success = Color(0xFFA3BE8F), Warning = Color(0xFFD6B47D),
-    Danger = Color(0xFFE4A08C), ActiveBg = Color(0xFF424633),
-    SurfaceVariant = Color(0xFF3B372D), Border = Color(0xFF514A3B),
+    Background = Color(0xFF181B19),
+    Card = Color(0xFF272D29),
+    SolidSurface = Color(0xFF303832),
+    Primary = Color(0xFFE5E7DE),
+    Accent = Color(0xFFAAC8AF), OnAccent = Color(0xFF192C21),
+    TextPrimary = Color(0xFFE5E7DE),
+    TextSecondary = Color(0xFFAAB1A8),
+    Success = Color(0xFFA5C6AA), Warning = Color(0xFFD7B687),
+    Danger = Color(0xFFE3A99B), ActiveBg = Color(0xFF304438),
+    SurfaceVariant = Color(0xFF39423B), Border = Color(0xFF424A44),
     isDark = true
 )
 
 data class AppColorSet(
     val Background: Color, val Card: Color,
     val SolidSurface: Color = Color.White,
-    val Primary: Color, val Accent: Color,
+    val Primary: Color, val Accent: Color, val OnAccent: Color,
     val TextPrimary: Color, val TextSecondary: Color,
     val Success: Color, val Warning: Color,
     val Danger: Color, val ActiveBg: Color,
@@ -76,9 +75,9 @@ object AppColors {
     val Danger: Color @Composable get() = LocalAppColors.current.Danger
     val ActiveBg: Color @Composable get() = LocalAppColors.current.ActiveBg
     val Border: Color @Composable get() = LocalAppColors.current.Border
-    val OnAccent: Color @Composable get() = if (isDark) Color(0xFF2D3321) else Color(0xFFFFFCF4)
-    val Cold: Color @Composable get() = if (isDark) Color(0xFFA9C1C5) else Color(0xFF527783)
-    val Hot: Color @Composable get() = if (isDark) Color(0xFFD7AF87) else Color(0xFFAC7748)
+    val OnAccent: Color @Composable get() = LocalAppColors.current.OnAccent
+    val Cold: Color @Composable get() = if (isDark) Color(0xFF9FBAC5) else Color(0xFF527783)
+    val Hot: Color @Composable get() = if (isDark) Color(0xFFD0A88A) else Color(0xFFAC7748)
     val isDark: Boolean @Composable get() = LocalAppColors.current.isDark
 }
 
@@ -93,18 +92,33 @@ fun MudLifeThemeSpecific(mode: ThemeMode, content: @Composable () -> Unit) {
         secondaryContainer = set.ActiveBg,
         onSecondaryContainer = set.Accent,
         background = set.Background,
-        surface = set.SolidSurface,
-        surfaceContainer = set.SolidSurface,
+        surface = set.Card,
+        surfaceDim = set.Background,
+        surfaceBright = Color(0xFF414A43),
+        surfaceContainerLowest = Color(0xFF131613),
+        surfaceContainerLow = Color(0xFF1E231F),
+        surfaceContainer = set.Card,
         surfaceContainerHigh = set.SolidSurface,
-        surfaceContainerHighest = set.SolidSurface,
-        onPrimary = Color(0xFF2D3321),
+        surfaceContainerHighest = set.SurfaceVariant,
+        onPrimary = set.OnAccent,
         onSurface = set.TextPrimary,
         onBackground = set.TextPrimary,
         onSurfaceVariant = set.TextSecondary,
-        outline = set.Border,
+        outline = Color(0xFF738176),
         outlineVariant = set.Border,
         error = set.Danger,
+        onError = Color(0xFF34201C),
+        errorContainer = Color(0xFF4B332F),
+        onErrorContainer = set.Danger,
         secondary = set.TextSecondary,
+        onSecondary = set.OnAccent,
+        tertiary = set.Warning,
+        onTertiary = Color(0xFF33281A),
+        tertiaryContainer = Color(0xFF463B2C),
+        onTertiaryContainer = set.Warning,
+        inverseSurface = set.TextPrimary,
+        inverseOnSurface = set.Background,
+        inversePrimary = LightColors.Accent,
         surfaceVariant = set.SurfaceVariant
     ) else lightColorScheme(
         primary = set.Accent,
@@ -117,7 +131,7 @@ fun MudLifeThemeSpecific(mode: ThemeMode, content: @Composable () -> Unit) {
         surfaceContainer = set.SolidSurface,
         surfaceContainerHigh = set.SolidSurface,
         surfaceContainerHighest = set.SolidSurface,
-        onPrimary = Color(0xFFFFFCF4),
+        onPrimary = set.OnAccent,
         onSurface = set.TextPrimary,
         onBackground = set.TextPrimary,
         onSurfaceVariant = set.TextSecondary,

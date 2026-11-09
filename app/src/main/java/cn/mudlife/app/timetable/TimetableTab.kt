@@ -3,8 +3,10 @@ package cn.mudlife.app.timetable
 import android.app.Activity
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -203,9 +205,21 @@ private class TimetableController(
             scaleType = ImageView.ScaleType.CENTER_CROP
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             // A continuous wash keeps the header and system icons legible without hiding the image at the edges.
-            foreground = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(ColorUtils.setAlphaComponent(paper, 193), ColorUtils.setAlphaComponent(paper, 24),
-                    ColorUtils.setAlphaComponent(paper, 78)))
+            val alphas = if (dark) intArrayOf(234, 125, 156) else intArrayOf(193, 24, 78)
+            val wash = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                IntArray(alphas.size) { ColorUtils.setAlphaComponent(paper, alphas[it]) })
+            foreground = if (dark) {
+                // Feather the backing of the small bell times into the photo, including on a bright wallpaper.
+                val startEdge = if (resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL)
+                    GradientDrawable.Orientation.RIGHT_LEFT else GradientDrawable.Orientation.LEFT_RIGHT
+                val axis = GradientDrawable(startEdge,
+                    intArrayOf(ColorUtils.setAlphaComponent(paper, 188), ColorUtils.setAlphaComponent(paper, 172),
+                        ColorUtils.setAlphaComponent(paper, 0)))
+                LayerDrawable(arrayOf(wash, axis)).apply {
+                    setLayerWidth(1, (92 * resources.displayMetrics.density).toInt())
+                    setLayerGravity(1, Gravity.START or Gravity.FILL_VERTICAL)
+                }
+            } else wash
         }
         pager = TimetableWeekPager(activity, {
             WeeklyTimetableView(activity, ::details, ::addCourse,

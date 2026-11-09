@@ -17,7 +17,7 @@ import cn.mudlife.app.utils.PrefsHelper
 
 @Composable internal fun Paper(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp), border = BorderStroke(.65.dp, MaterialTheme.colorScheme.outline)) {
+        shape = RoundedCornerShape(16.dp), border = BorderStroke(.65.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(16.dp), content = content)
     }
 }

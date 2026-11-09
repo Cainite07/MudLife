@@ -86,7 +86,7 @@ fun QzhqLoginDialog(
                                 "密码登录",
                                 fontSize = 12.sp,
                                 fontWeight = if (loginMode == "password") FontWeight.Bold else FontWeight.Normal,
-                                color = if (loginMode == "password") Color.White else AppColors.TextSecondary
+                                color = if (loginMode == "password") AppColors.OnAccent else AppColors.TextSecondary
                             )
                         }
                     }
@@ -107,7 +107,7 @@ fun QzhqLoginDialog(
                                 "验证码登录",
                                 fontSize = 12.sp,
                                 fontWeight = if (loginMode == "sms") FontWeight.Bold else FontWeight.Normal,
-                                color = if (loginMode == "sms") Color.White else AppColors.TextSecondary
+                                color = if (loginMode == "sms") AppColors.OnAccent else AppColors.TextSecondary
                             )
                         }
                     }
@@ -189,7 +189,7 @@ fun QzhqLoginDialog(
                             modifier = Modifier.height(52.dp)
                         ) {
                             if (isSendingSms) {
-                                CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                CircularProgressIndicator(Modifier.size(16.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
                             } else {
                                 Text(
                                     if (countdown > 0) "${countdown}s" else "获取验证码",

@@ -44,13 +44,15 @@ import kotlinx.coroutines.withContext
                 }.getOrNull()
             }
         }
+        val current = encoded?.takeIf { it.first == codeValue }?.second
+        val visibleCode = current?.takeIf { vm.codeSeconds > 0 }
         Box(Modifier.align(Alignment.CenterHorizontally).widthIn(max = 285.dp).fillMaxWidth().aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp)).background(Color.White), contentAlignment = Alignment.Center) {
-            val current = encoded?.takeIf { it.first == codeValue }?.second
-            if (codeValue != null && vm.codeSeconds > 0 && current != null) Image(current.asImageBitmap(), "校园付款二维码", Modifier.fillMaxSize())
+            .clip(RoundedCornerShape(16.dp)).background(if (visibleCode == null && AppColors.isDark) AppColors.Card else Color.White),
+            contentAlignment = Alignment.Center) {
+            if (visibleCode != null) Image(visibleCode.asImageBitmap(), "校园付款二维码", Modifier.fillMaxSize())
             else if (vm.codeBusy || (codeValue != null && current == null)) CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 2.dp)
             else Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(vm.codeError ?: "付款码暂不可用", color = Color(0xFF292F2B), fontSize = 13.sp)
+                Text(vm.codeError ?: "付款码暂不可用", color = AppColors.TextPrimary, fontSize = 13.sp)
                 TextButton(onClick = { tap(); vm.generateCode() }, enabled = !vm.needsLogin) { Text("重新加载") }
             }
         }

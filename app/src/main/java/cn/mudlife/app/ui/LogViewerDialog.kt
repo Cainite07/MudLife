@@ -227,7 +227,7 @@ fun LogViewerDialog(onDismiss: () -> Unit) {
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AppColors.Accent)
                         ) {
-                            Text("📤 分享", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("📤 分享", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.OnAccent)
                         }
 
                         // 一键复制最近报错

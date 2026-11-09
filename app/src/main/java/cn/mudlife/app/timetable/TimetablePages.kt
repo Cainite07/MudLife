@@ -73,9 +73,9 @@ internal fun TimetablePages(
             sheetGesturesEnabled = open,
             sheetShape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
             sheetElevation = 0.dp,
-            sheetBackgroundColor = AppColors.Background,
+            sheetBackgroundColor = timetableSheetSurface,
             sheetContentColor = AppColors.TextPrimary,
-            scrimColor = Color.Black.copy(alpha = .32f),
+            scrimColor = Color.Black.copy(alpha = if (AppColors.isDark) .48f else .32f),
             sheetContent = {
                 if (presented != null) {
                     Column(Modifier.fillMaxWidth().heightIn(max = maxSheetHeight).onSizeChanged { measured = it.height > 0 }

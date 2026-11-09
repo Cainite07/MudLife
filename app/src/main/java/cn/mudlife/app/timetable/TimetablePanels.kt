@@ -142,7 +142,7 @@ internal fun TimetablePage(
 ) {
     val back = LocalMenuBack.current
     val pageSize = if (wrapContentHeight) Modifier.fillMaxWidth() else Modifier.fillMaxSize()
-    Column(pageSize.background(AppColors.Background)) {
+    Column(pageSize.background(timetableSheetSurface)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 4.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
             HeaderIcon(Icons.Outlined.ArrowBack, if (back == null) "返回课表" else "返回上一级", back ?: dismiss)

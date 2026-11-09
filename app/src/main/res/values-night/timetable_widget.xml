@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="tt_widget_paper">#302D25</color>
-    <color name="tt_widget_ink">#EDE4D1</color>
-    <color name="tt_widget_accent">#C4C79C</color>
-    <color name="tt_widget_detail">#B8AC94</color>
-    <color name="tt_widget_rail">#424633</color>
-    <color name="tt_widget_rule">#514A3B</color>
+    <color name="tt_widget_paper">#272D29</color>
+    <color name="tt_widget_ink">#E5E7DE</color>
+    <color name="tt_widget_accent">#AAC8AF</color>
+    <color name="tt_widget_detail">#AAB1A8</color>
+    <color name="tt_widget_rail">#304438</color>
+    <color name="tt_widget_rule">#424A44</color>
 </resources>

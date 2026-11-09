@@ -52,7 +52,7 @@ import java.time.YearMonth
             }
             val card = vm.currentCard
             val colors = MaterialTheme.colorScheme
-            Surface(Modifier.fillMaxWidth(), color = colors.surface, shape = RoundedCornerShape(18.dp), border = BorderStroke(.7.dp, colors.outline)) {
+            Surface(Modifier.fillMaxWidth(), color = colors.surface, shape = RoundedCornerShape(18.dp), border = BorderStroke(.7.dp, colors.outlineVariant)) {
                 Column(Modifier.padding(20.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(card?.name ?: "校园卡", fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
@@ -71,7 +71,7 @@ import java.time.YearMonth
                             Text("充值", fontSize = 14.sp)
                         }
                     }
-                    HorizontalDivider(color = colors.outline.copy(alpha = .65f))
+                    HorizontalDivider(color = colors.outlineVariant.copy(alpha = .65f))
                     Row(Modifier.fillMaxWidth().padding(top = 13.dp)) {
                         Text(card?.owner.orEmpty(), fontSize = 12.sp, modifier = Modifier.weight(1f), color = colors.onSurfaceVariant)
                         Text(card?.number?.takeIf { it.isNotBlank() }?.let { "尾号 ${it.takeLast(4)}" }.orEmpty(), fontSize = 11.sp, color = colors.onSurfaceVariant)
@@ -108,7 +108,7 @@ import java.time.YearMonth
         }
         Paper {
             StartupSetting(vm)
-            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("出示时提亮并保持常亮", fontSize = 14.sp, modifier = Modifier.weight(1f).padding(end = 12.dp))
                 Switch(checked = vm.brightCode, onCheckedChange = vm::updateBrightCode)
@@ -142,7 +142,7 @@ import java.time.YearMonth
             }
             Paper {
                 ProfileRow("更新学校认证", Icons.Outlined.Lock, login)
-                HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 ProfileRow("退出登录", Icons.Outlined.Logout, logout)
             }
             Text("泥浆校园卡  ${BuildConfig.VERSION_NAME}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 20.dp))
@@ -223,7 +223,7 @@ import java.time.YearMonth
                         Column(Modifier.weight(1f).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(bill.title, maxLines = 2, overflow = TextOverflow.Ellipsis, fontSize = 14.sp); Text(bill.time, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Text(bill.displayAmount, fontSize = 15.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace)
                     }
-                    HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = .65f))
+                    HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .65f))
                 }
             }
             item {
@@ -271,7 +271,7 @@ import java.time.YearMonth
                         Text(title, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(52.dp))
                         Text(vm.electricSelected[i]?.name ?: "请选择", fontSize = 16.sp, modifier = Modifier.weight(1f).padding(end = 8.dp)); Icon(Icons.Outlined.ExpandMore, null, Modifier.size(19.dp))
                     }
-                    if (i < 2) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    if (i < 2) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
             vm.electricError?.let { Text(it, fontSize = 14.sp); TextButton(onClick = vm::refreshElectric) { Text("重试") } }

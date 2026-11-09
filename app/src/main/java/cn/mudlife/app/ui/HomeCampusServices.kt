@@ -59,7 +59,7 @@ internal fun HomeCampusServices(
             ServiceAction("付款码", Icons.Outlined.QrCode2, AppColors.Accent, Modifier.weight(1f), onPayment)
             ServiceAction("扫码出水", Icons.Outlined.QrCodeScanner, AppColors.Cold, Modifier.weight(1f), onScan)
             ServiceAction("宿舍电费", Icons.Outlined.Bolt, AppColors.Hot, Modifier.weight(1f), onElectric)
-            ServiceAction("使用码", Icons.Outlined.Key, if (dark) Color(0xFFCCBFD4) else Color(0xFF73667C),
+            ServiceAction("使用码", Icons.Outlined.Key, if (dark) Color(0xFFB2A4BB) else Color(0xFF73667C),
                 Modifier.weight(1f), onCodes)
         }
     }
@@ -76,7 +76,7 @@ private fun ServiceAction(title: String, icon: ImageVector, tint: Color, modifie
         verticalArrangement = Arrangement.Center
     ) {
         Box(
-            Modifier.size(44.dp).background(tint.copy(alpha = if (AppColors.isDark) .20f else .13f), RoundedCornerShape(15.dp)),
+            Modifier.size(44.dp).background(tint.copy(alpha = if (AppColors.isDark) .14f else .13f), RoundedCornerShape(15.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, null, Modifier.size(23.dp), tint = tint)

@@ -40,10 +40,11 @@ internal class WeeklyTimetableView(
     private val paper = theme.Background.toArgb()
     private val rail = theme.Card.toArgb()
     private val ink = theme.TextPrimary.toArgb()
-    private val muted = ColorUtils.blendARGB(ink, theme.TextSecondary.toArgb(), .75f)
+    private val muted = if (dark) theme.TextSecondary.toArgb() else ColorUtils.blendARGB(ink, theme.TextSecondary.toArgb(), .75f)
     private val rules = ColorUtils.blendARGB(paper, theme.Border.toArgb(), .8f)
     private val divider = theme.Border.toArgb()
     private val todayShade = theme.ActiveBg.toArgb()
+    private val todayColumn = if (dark) ColorUtils.blendARGB(paper, todayShade, .48f) else todayShade
     private val todayHeading = theme.Accent.toArgb()
     private val wideAxis = max(dp(38), (sp(10.5f) * 2.9f).roundToInt() + dp(6))
     private val narrowAxis = max(dp(28), (sp(14f) * 1.7f).roundToInt() + dp(4))
@@ -308,7 +309,7 @@ internal class WeeklyTimetableView(
         init { setWillNotDraw(false) }
 
         fun updateShade(isToday: Boolean) {
-            val shade = if (isToday) todayShade else paper
+            val shade = if (isToday) todayColumn else paper
             val fill = if (!wallpaper) shade else if (isToday) ColorUtils.setAlphaComponent(todayShade, 28) else Color.TRANSPARENT
             if (fill != shadeColor) {
                 setBackgroundColor(fill)
@@ -420,8 +421,9 @@ internal class WeeklyTimetableView(
         val custom = selectedColors[course.name]?.let { ColorUtils.setAlphaComponent(it, 255) }
         val base = when {
             inactive -> theme.SurfaceVariant.toArgb()
+            dark -> darkCourseFill(custom ?: swatch)
             custom != null -> custom
-            else -> ColorUtils.blendARGB(paper, swatch, if (dark) .33f else .30f)
+            else -> ColorUtils.blendARGB(paper, swatch, .30f)
         }
         // Inactive cards fade as a single layer so their lettering fades exactly as much as their fill.
         val fill = if (inactive) base else ColorUtils.setAlphaComponent(base, (cardOptions.cardOpacity * 255 / 100f).roundToInt())
@@ -439,7 +441,12 @@ internal class WeeklyTimetableView(
         }
         val horizontalGravity = if (cardOptions.centerTextHorizontally) Gravity.CENTER_HORIZONTAL else Gravity.START
         val verticalGravity = if (cardOptions.centerTextVertically) Gravity.CENTER_VERTICAL else Gravity.TOP
-        fun cardText(value: String, size: Float) = text(value, size, solidText ?: ink).apply {
+        val detailInk = if (dark && solidText != null) {
+            val softer = ColorUtils.blendARGB(solidText, base, .18f)
+            if (ColorUtils.calculateContrast(softer, lightest) >= 4.5 && ColorUtils.calculateContrast(softer, darkest) >= 4.5)
+                softer else solidText
+        } else solidText ?: ink
+        fun cardText(value: String, size: Float, tint: Int = solidText ?: ink) = text(value, size, tint).apply {
             typeface = courseTypeface
             gravity = horizontalGravity or Gravity.CENTER_VERTICAL
             if (solidText == null) {
@@ -466,7 +473,7 @@ internal class WeeklyTimetableView(
             addView(name, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1f))
             fun detail(value: String, lines: Int, size: Float = COURSE_LABEL_SP) {
                 if (value.isBlank()) return
-                addView(cardText(value, size).apply {
+                addView(cardText(value, size, detailInk).apply {
                     maxLines = lines
                     ellipsize = TextUtils.TruncateAt.END
                     importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO

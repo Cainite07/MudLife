@@ -47,9 +47,16 @@ internal fun CampusNavigationBar(selected: Int, select: (Int) -> Unit) {
     val indicator = AppColors.ActiveBg.copy(alpha = .91f)
     val position = animateFloatAsState(selected.toFloat(), tween(215, easing = FastOutSlowInEasing),
         label = "selectedTabPosition")
-    val scrim = remember(paper) {
-        Brush.verticalGradient(0f to paper.copy(alpha = 0f), .34f to paper.copy(alpha = .68f),
-            .72f to paper.copy(alpha = .82f), 1f to paper.copy(alpha = .88f))
+    val dark = AppColors.isDark
+    val scrim = remember(paper, dark) {
+        if (dark) {
+            // Keep light icons readable over a bright timetable wallpaper.
+            Brush.verticalGradient(0f to paper.copy(alpha = 0f), .16f to paper.copy(alpha = .78f),
+                .40f to paper.copy(alpha = .88f), 1f to paper.copy(alpha = .91f))
+        } else {
+            Brush.verticalGradient(0f to paper.copy(alpha = 0f), .34f to paper.copy(alpha = .68f),
+                .72f to paper.copy(alpha = .82f), 1f to paper.copy(alpha = .88f))
+        }
     }
     Box(Modifier.fillMaxWidth().background(scrim)
         .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout)

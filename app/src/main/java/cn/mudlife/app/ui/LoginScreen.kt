@@ -91,7 +91,7 @@ fun LoginScreen(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(RoundedCornerShape(22.dp))
-                        .background(Color(0xFFF1E6C9))
+                        .background(if (isDark) AppColors.Accent else Color(0xFFF1E6C9))
                 )
                 Image(painterResource(R.mipmap.ic_launcher_foreground), "江大生活", modifier = Modifier.size(72.dp))
             }
@@ -310,7 +310,7 @@ fun LoginScreen(
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                             ) {
                                 if (viewModel.isLoading) {
-                                    CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+                                    CircularProgressIndicator(Modifier.size(22.dp), color = if (isDark) AppColors.TextPrimary else Color.White, strokeWidth = 2.dp)
                                 } else {
                                     Text("登 录", fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                                 }
@@ -367,8 +367,8 @@ fun LoginScreen(
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = AppColors.ActiveBg,
                                         contentColor = AppColors.Accent,
-                                        disabledContainerColor = if (isDark) Color(0x10FFFFFF) else Color(0x10000000),
-                                        disabledContentColor = if (isDark) Color.White.copy(alpha = 0.4f) else Color(0xFF94A3B8)
+                                        disabledContainerColor = if (isDark) AppColors.Card else Color(0x10000000),
+                                        disabledContentColor = if (isDark) AppColors.TextSecondary.copy(alpha = .7f) else Color(0xFF94A3B8)
                                     ),
                                     border = BorderStroke(
                                         1.dp,
@@ -403,7 +403,7 @@ fun LoginScreen(
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                             ) {
                                 if (viewModel.isLoading) {
-                                    CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+                                    CircularProgressIndicator(Modifier.size(22.dp), color = if (isDark) AppColors.TextPrimary else Color.White, strokeWidth = 2.dp)
                                 } else {
                                     Text("登 录", fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                                 }
@@ -415,13 +415,13 @@ fun LoginScreen(
                         Spacer(Modifier.height(14.dp))
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0x25EF4444),
-                            border = BorderStroke(1.dp, Color(0x45EF4444))
+                            color = if (isDark) MaterialTheme.colorScheme.errorContainer else Color(0x25EF4444),
+                            border = BorderStroke(1.dp, if (isDark) AppColors.Danger.copy(alpha = .25f) else Color(0x45EF4444))
                         ) {
                             Text(
                                 msg,
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                color = if (isDark) Color(0xFFFCA5A5) else Color(0xFFDC2626),
+                                color = if (isDark) AppColors.Danger else Color(0xFFDC2626),
                                 fontSize = 12.sp,
                                 textAlign = TextAlign.Center
                             )

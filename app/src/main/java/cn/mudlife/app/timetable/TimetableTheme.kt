@@ -2,21 +2,31 @@ package cn.mudlife.app.timetable
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.core.graphics.ColorUtils
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import cn.mudlife.app.R
+import cn.mudlife.app.ui.theme.AppColors
+import cn.mudlife.app.ui.theme.DarkColors
 import cn.mudlife.app.ui.theme.MudLifeThemeSpecific
 import cn.mudlife.app.ui.theme.ThemeMode
 import cn.mudlife.app.utils.PrefsHelper
+
+internal fun darkCourseFill(swatch: Int) =
+    ColorUtils.blendARGB(DarkColors.Background.toArgb(), swatch, .50f)
+
+internal val timetableSheetSurface
+    @Composable get() = if (AppColors.isDark) AppColors.SolidSurface else AppColors.Background
 
 internal object TimetableType {
     private val displayFamily = FontFamily(Font(R.font.timetable_heading, weight = FontWeight.Medium))
