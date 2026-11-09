@@ -16,16 +16,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.mudlife.app.model.CampusBillCategory
 import cn.mudlife.app.model.CampusBillLedger
 import cn.mudlife.app.model.DeviceExpenses
+import cn.mudlife.app.model.MonthlyBillReport
+import cn.mudlife.app.model.UnifiedLedger
 import cn.mudlife.app.ui.theme.AppColors
 import cn.mudlife.app.utils.HapticHelper
 import cn.mudlife.app.utils.PrefsHelper
 import cn.mudlife.campuscard.*
+import java.time.LocalDate
+import java.time.YearMonth
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable internal fun UnifiedBillsPage(campus: CampusViewModel, life: MainViewModel, lifeLoggedIn: Boolean, schoolLogin: () -> Unit,
@@ -35,15 +40,19 @@ import cn.mudlife.campuscard.*
     // Preserve the month stored by the previous combined statement.
     val owner = campus.currentCard?.account.orEmpty() + "|"
     val legacyOwner = owner + if (PrefsHelper.isLoggedIn) PrefsHelper.telephone else ""
-    var period by remember(owner) { mutableStateOf(campus.session.unifiedPeriod(owner)
-        .ifBlank { campus.session.unifiedPeriod(legacyOwner) }.ifBlank { BillPeriodPolicy.save(campus.billMonth) }) }
+    var period by remember(owner, legacyOwner) { mutableStateOf(campus.session.unifiedPeriod(owner)
+        .ifBlank { campus.session.unifiedPeriod(legacyOwner) }.ifBlank { (campus.billMonth ?: YearMonth.now()).toString() }) }
     val month = remember(period) { BillPeriodPolicy.restore(period) }
-    var category by rememberSaveable { mutableStateOf(CampusBillCategory.ALL) }
+    val deviceOwner = PrefsHelper.userId
+    var category by rememberSaveable(owner, deviceOwner, period) { mutableStateOf(CampusBillCategory.ALL) }
+    var selectedDay by rememberSaveable(owner, deviceOwner, period) { mutableStateOf<Int?>(null) }
+    var categoryMenu by remember { mutableStateOf(false) }
+    var balanceOpen by rememberSaveable { mutableStateOf(false) }
     var monthMenu by remember { mutableStateOf(false) }
     var detail by remember(campus.currentCard?.account) { mutableStateOf<Bill?>(null) }
-    var limit by remember(period, category, campus.currentCard?.account) { mutableIntStateOf(50) }
+    var limit by remember(period, category, selectedDay, owner, deviceOwner) { mutableIntStateOf(50) }
     val devices = life.deviceBills
-    val deviceMonth = month ?: java.time.YearMonth.now()
+    val deviceMonth = month ?: YearMonth.now()
     LaunchedEffect(deviceMonth, lifeLoggedIn) {
         devices.attach(context)
         devices.load(deviceMonth)
@@ -58,17 +67,32 @@ import cn.mudlife.campuscard.*
     val deviceRecords = if (lifeLoggedIn) devices.records.values.flatten() else emptyList()
     val combined = remember(campus.allBills, deviceRecords) { DeviceExpenses.merge(campus.allBills, deviceRecords) }
     val monthRows = remember(combined, month) { CampusBillLedger.select(combined, month) }
-    val rows = remember(monthRows, category) { monthRows.filter { category == CampusBillCategory.ALL || CampusBillLedger.category(it) == category } }
+    val selectedDate = month?.let { m -> selectedDay?.takeIf(m::isValidDay)?.let { m.atDay(it).toString() } }
+    val rows = remember(monthRows, category, selectedDate) {
+        monthRows.filter { bill ->
+            (category == CampusBillCategory.ALL || CampusBillLedger.category(bill) == category) &&
+                (selectedDate == null || UnifiedLedger.normalizeTime(bill.time).startsWith(selectedDate))
+        }
+    }
     val displayRows = remember(rows) { DeviceExpenses.rows(rows) }
     val months = remember(combined, month) { (BillLedger.months(combined) + listOfNotNull(month)).distinct().sortedDescending() }
     val devicesComplete = !lifeLoggedIn || if (month == null) devices.historyComplete &&
         months.all { it >= devices.historyStart!! && devices.monthComplete(it) } else devices.monthComplete(month)
     val complete = (!campus.hasSession || campus.billsComplete) && devicesComplete
-    // Across months, show the known records explicitly as a synced subtotal.
-    val expense = when {
-        month == null && monthRows.isNotEmpty() -> CampusBillLedger.expense(monthRows)
-        complete -> CampusBillLedger.expense(monthRows)
-        else -> null
+    val previousComplete = month != null && (!campus.hasSession || campus.billsComplete) &&
+        (!lifeLoggedIn || devices.monthComplete(month.minusMonths(1)))
+    val today = LocalDate.now()
+    val report = remember(month, combined, complete, previousComplete, today) {
+        month?.let { MonthlyBillReport.build(it, combined, complete, previousComplete, today) }
+    }
+    val allExpense = remember(month, monthRows, complete) {
+        if (month == null && (complete || monthRows.isNotEmpty())) CampusBillLedger.expense(monthRows) else null
+    }
+    val hasBills = campus.hasSession || lifeLoggedIn
+    val selectPeriod: (String) -> Unit = { value ->
+        period = value
+        campus.session.saveUnifiedPeriod(owner, value)
+        monthMenu = false
     }
     var expandedWater by rememberSaveable(owner, period, PrefsHelper.userId) { mutableStateOf(emptyList<String>()) }
     val refreshing = campus.billSyncBusy || campus.busy || deviceMonth in devices.foregroundLoading
@@ -83,32 +107,45 @@ import cn.mudlife.campuscard.*
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(
             start = 22.dp + pageInsets.calculateStartPadding(direction), end = 22.dp + pageInsets.calculateEndPadding(direction),
             top = pageInsets.calculateTopPadding(), bottom = 24.dp + pageInsets.calculateBottomPadding())) {
-            item(key = "title") { PageTitle("账单", padded = false) }
-            item(key = "balance") { CampusBalance(campus, schoolLogin, recharge) }
-            if (campus.hasSession || lifeLoggedIn) {
-                item(key = "summary") {
-                    Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            item(key = "title") {
+                if (!hasBills) {
+                    PageTitle("账单", padded = false)
+                } else {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 58.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) {
-                            TextButton(onClick = { tap(); monthMenu = true }, contentPadding = PaddingValues(0.dp)) {
-                                Text(month?.let { "${it.year}年 ${it.monthValue}月" } ?: "全部月份", fontSize = 14.sp)
-                                Icon(Icons.Outlined.ExpandMore, "选择月份", Modifier.padding(start = 4.dp).size(18.dp))
+                            Row(Modifier.clickable { tap(); monthMenu = true }.padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Text(month?.let { "${it.monthValue}月账单" } ?: "全部月份", fontFamily = FontFamily.Serif,
+                                    fontWeight = FontWeight.SemiBold, fontSize = 25.sp, color = AppColors.TextPrimary)
+                                Icon(Icons.Outlined.ExpandMore, "选择月份", Modifier.padding(start = 4.dp).size(18.dp), tint = AppColors.TextSecondary)
                             }
                             DropdownMenu(monthMenu, onDismissRequest = { monthMenu = false }, modifier = Modifier.heightIn(max = 360.dp)) {
-                                DropdownMenuItem(text = { Text("全部月份") }, onClick = { tap(); period = "ALL"; campus.session.saveUnifiedPeriod(owner, period); monthMenu = false })
-                                months.forEach { m -> DropdownMenuItem(text = { Text("${if (m == month) "✓ " else ""}${m.year}年 ${m.monthValue}月") }, onClick = { tap(); period = m.toString(); campus.session.saveUnifiedPeriod(owner, period); monthMenu = false }) }
+                                DropdownMenuItem(text = { Text("全部月份") }, onClick = { tap(); selectPeriod("ALL") })
+                                months.forEach { value ->
+                                    DropdownMenuItem(text = { Text("${if (value == month) "✓ " else ""}${value.year}年 ${value.monthValue}月") },
+                                        onClick = { tap(); selectPeriod(value.toString()) })
+                                }
                             }
                         }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(if (month == null) "支出合计" else "本月支出", fontSize = 11.sp, color = AppColors.TextSecondary)
-                            Text(expense?.let { "¥ ${Money.yuan(it)}" } ?: "— —", fontSize = 22.sp, fontWeight = FontWeight.Medium)
+                        if (month == null) TextButton(onClick = { tap(); selectPeriod(YearMonth.now().toString()) }) { Text("本月月报") }
+                        TextButton(onClick = { tap(); balanceOpen = true }) {
+                            Icon(Icons.Outlined.AccountBalanceWallet, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(5.dp)); Text("校园卡")
                         }
                     }
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        CampusBillCategory.entries.forEach { item ->
-                            FilterChip(category == item, onClick = { tap(); category = item }, label = { Text(item.label, fontSize = 12.sp) },
-                                shape = RoundedCornerShape(12.dp), colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = AppColors.ActiveBg, selectedLabelColor = AppColors.Accent, labelColor = AppColors.TextSecondary))
+                }
+            }
+            if (!hasBills) item(key = "balance") { CampusBalance(campus, schoolLogin, recharge) }
+            if (hasBills) {
+                item(key = "summary") {
+                    if (report != null) {
+                        key(owner, deviceOwner, period) {
+                            MonthlyBillOverview(report, category, selectedDay, { selectedDay = it }, { category = it })
                         }
+                    } else {
+                        Text("支出合计", color = AppColors.TextSecondary, fontSize = 12.sp)
+                        Text(allExpense?.let { "¥ ${Money.yuan(it)}" } ?: "— —", color = AppColors.TextPrimary,
+                            fontSize = 28.sp, modifier = Modifier.padding(bottom = 8.dp))
                     }
                     if (campus.billError != null) TextButton(onClick = { tap(); if (campus.needsLogin) schoolLogin() else campus.refreshBills() }) {
                         Text(if (campus.needsLogin) "学校登录已过期，重新登录" else "同步失败，点击重试", fontSize = 12.sp)
@@ -116,7 +153,28 @@ import cn.mudlife.campuscard.*
                     if (lifeLoggedIn && deviceMonth in devices.errors) TextButton(onClick = { tap(); devices.load(deviceMonth, force = true) }) {
                         Text(devices.errors.getValue(deviceMonth), fontSize = 12.sp)
                     }
-
+                }
+                item(key = "ledgerHeader") {
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("账单流水", Modifier.weight(1f), fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.SemiBold, fontSize = 20.sp, color = AppColors.TextPrimary)
+                        selectedDay?.let { day ->
+                            TextButton(onClick = { tap(); selectedDay = null }) { Text("${day}日 ×") }
+                        }
+                        Box {
+                            TextButton(onClick = { tap(); categoryMenu = true }) {
+                                Text(if (category == CampusBillCategory.ALL) "全部分类" else category.label)
+                                Icon(Icons.Outlined.ExpandMore, "筛选流水分类", Modifier.size(16.dp))
+                            }
+                            DropdownMenu(categoryMenu, onDismissRequest = { categoryMenu = false }) {
+                                CampusBillCategory.entries.forEach { choice ->
+                                    DropdownMenuItem(text = { Text(choice.label) }, onClick = {
+                                        tap(); category = choice; categoryMenu = false
+                                    })
+                                }
+                            }
+                        }
+                    }
                 }
                 displayRows.take(limit).groupBy { it.day }.forEach { (day, entries) ->
                     item(key = "day:$day") { Text(day, fontSize = 12.sp, color = AppColors.TextSecondary,
@@ -151,6 +209,9 @@ import cn.mudlife.campuscard.*
         PullRefreshIndicator(refreshing, pull, Modifier.align(Alignment.TopCenter).padding(top = pageInsets.calculateTopPadding()),
             backgroundColor = AppColors.Card)
     }
+    if (balanceOpen && hasBills) AlertDialog(onDismissRequest = { balanceOpen = false },
+        text = { CampusBalance(campus, { balanceOpen = false; schoolLogin() }, { balanceOpen = false; recharge() }) },
+        confirmButton = { TextButton(onClick = { balanceOpen = false }) { Text("关闭") } })
     detail?.let { bill -> AlertDialog(onDismissRequest = { detail = null }, title = { Text(bill.title) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(bill.fen?.takeUnless { it == Long.MIN_VALUE }?.let { "¥ ${Money.yuan(kotlin.math.abs(it))}" } ?: "金额未知", fontSize = 26.sp)
