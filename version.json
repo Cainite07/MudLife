@@ -1,11 +1,11 @@
 {
-  "versionCode": 41,
-  "versionName": "1.5.0",
+  "versionCode": 42,
+  "versionName": "1.5.1",
   "releaseDate": "2026-11-09",
-  "title": "江大生活 · Jiangda Life v1.5.0",
-  "changelog": "· 底栏新增课表，可从江苏大学本科教务导入个人课表，预览后确认，也可创建空白学期、手动添加和修改课程。\n· 周课表支持自定义节次、上下课时间、课程显示和背景。桌面可添加「今日课表」小组件。\n· 校园卡移到首页顶部，点余额卡即可出示付款码，下方集中放置付款码、扫码出水、宿舍电费和使用码。\n· 调整四个主页面的上下栏与切换动效，课表背景延伸到屏幕边缘，切换栏目会保留已选周次。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.0/MudLife-1.5.0.apk",
+  "title": "江大生活 · Jiangda Life v1.5.1",
+  "changelog": "· 账单新增月报，直接展示每日支出柱状图、日历与分类占比；生活小记在本机按规则生成，每 10 秒切换，不调用 AI 服务。\n· 改善深色模式的页面、课程卡片和底栏层次，保持文字与背景清晰。\n· 修复生活小记切换时短暂空白、课表行高调节不生效及进入课表时边缘闪亮的问题。\n· 缩小课表工具菜单，桌面小组件入口增加请求反馈及手动添加说明。\n· 校园卡余额与充值改为底部卡片面板，保留现有切卡和充值操作。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.1/MudLife-1.5.1.apk",
   "mirrors": [
-    "https://gitee.com/cainite/MudLife/releases/download/v1.5.0/MudLife-1.5.0.apk"
+    "https://gitee.com/cainite/MudLife/releases/download/v1.5.1/MudLife-1.5.1.apk"
   ]
 }
