@@ -444,7 +444,10 @@ private class TimetableController(
             TimetablePanel.Tools -> TimetableActions(term, rows.size, { openMenu(TimetablePanel.Seasons) },
                 { addCourse() }, { dismiss(); openImport() }, { openMenu(TimetablePanel.AllCourses) },
                 { openMenu(TimetablePanel.Display) }, { openMenu(TimetablePanel.Bells) },
-                { TodayTimetableWidget.pin(activity) })
+                { openMenu(TimetablePanel.AddWidget) })
+            TimetablePanel.AddWidget -> AddWidgetPanel(dismiss, remember(activity) { TodayTimetableWidget.supportsPin(activity) }) {
+                TodayTimetableWidget.requestPin(activity)
+            }
             TimetablePanel.Display -> DisplayOptionsPanel(dismiss) { openMenu(TimetablePanel.DisplayGroup(it)) }
             is TimetablePanel.DisplayGroup -> DisplayGroupPanel(page.group, displayOptions, dismiss, ::setFirstDay, {
                 if (wallpaper) openMenu(TimetablePanel.Wallpaper) else appearance.chooseWallpaper()

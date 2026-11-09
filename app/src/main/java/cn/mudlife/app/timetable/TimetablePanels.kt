@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -37,6 +39,7 @@ import java.time.LocalDate
 
 internal sealed interface TimetablePanel {
     data object Tools : TimetablePanel
+    data object AddWidget : TimetablePanel
     data object Display : TimetablePanel
     data class DisplayGroup(val group: TimetableDisplayGroup) : TimetablePanel
     data class BellDetail(val number: Int) : TimetablePanel
@@ -194,18 +197,18 @@ internal fun MenuRow(icon: ImageVector, title: String, value: String = "", title
 @Composable
 internal fun TimetableActions(term: String?, count: Int, selectTerm: () -> Unit, create: () -> Unit,
     sync: () -> Unit, courses: () -> Unit, settings: () -> Unit, bells: () -> Unit, widget: () -> Unit) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 12.dp)) {
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(AppColors.ActiveBg)
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 10.dp)) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(AppColors.ActiveBg)
             .clickable(role = Role.Button, onClickLabel = "切换学期", onClick = selectTerm)
-            .heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(term ?: "选择学期", style = TimetableType.dataTitle.copy(fontSize = 17.sp, lineHeight = 22.sp), color = AppColors.TextPrimary)
+            .heightIn(min = 48.dp).padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(term ?: "选择学期", style = TimetableType.dataTitle.copy(fontSize = 16.sp, lineHeight = 21.sp), color = AppColors.TextPrimary)
                 if (term != null) Text("$count 条安排", style = TimetableType.detail, color = AppColors.TextSecondary)
             }
-            Icon(Icons.Outlined.UnfoldMore, "切换学期", Modifier.size(21.dp), tint = AppColors.Accent)
+            Icon(Icons.Outlined.UnfoldMore, "切换学期", Modifier.size(20.dp), tint = AppColors.Accent)
         }
-        Spacer(Modifier.height(8.dp))
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(AppColors.Card).padding(vertical = 4.dp)) {
+        Spacer(Modifier.height(7.dp))
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(AppColors.Card).padding(vertical = 3.dp)) {
             Row(Modifier.fillMaxWidth()) {
                 ActionTile(Icons.Outlined.Add, "添加课程", create)
                 ActionTile(Icons.Outlined.Sync, "教务同步", sync)
@@ -221,13 +224,35 @@ internal fun TimetableActions(term: String?, count: Int, selectTerm: () -> Unit,
 }
 
 @Composable
+internal fun AddWidgetPanel(dismiss: () -> Unit, supportsPin: Boolean, requestPin: () -> Boolean) {
+    var requested by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    TimetablePage("添加今日课表", dismiss, wrapContentHeight = true) {
+        if (supportsPin) {
+            Button(onClick = { requested = requestPin() }, modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)) { Text(if (requested == null) "从应用添加" else "重新请求添加") }
+            requested?.let { sent ->
+                Text(if (sent) "已向系统请求添加。若没有出现确认窗口，请按下方步骤从桌面添加。" else "暂时无法发出请求，请从桌面添加。",
+                    Modifier.padding(top = 6.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                    style = TimetableType.detail, color = AppColors.TextSecondary)
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+        Text("从桌面添加", Modifier.semantics { heading() }, style = TimetableType.section, color = AppColors.TextPrimary)
+        Text("长按桌面空白处，打开「小组件」「添加工具」或「应用挂件」。",
+            Modifier.padding(top = 8.dp), style = TimetableType.body, color = AppColors.TextPrimary)
+        Text("找到「江大生活」，将「今日课表」添加到桌面。",
+            Modifier.padding(top = 6.dp, bottom = 8.dp), style = TimetableType.body, color = AppColors.TextPrimary)
+    }
+}
+
+@Composable
 private fun RowScope.ActionTile(icon: ImageVector, title: String, action: () -> Unit, enabled: Boolean = true) {
     val tint = if (enabled) AppColors.Accent else AppColors.TextSecondary.copy(alpha = .55f)
-    Column(Modifier.weight(1f).heightIn(min = 68.dp)
-        .clickable(enabled = enabled, role = Role.Button, onClick = action).padding(vertical = 7.dp),
+    Column(Modifier.weight(1f).heightIn(min = 61.dp)
+        .clickable(enabled = enabled, role = Role.Button, onClick = action).padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Icon(icon, null, Modifier.size(22.dp), tint = tint)
-        Spacer(Modifier.height(4.dp))
+        Icon(icon, null, Modifier.size(20.dp), tint = tint)
+        Spacer(Modifier.height(3.dp))
         Text(title, style = TimetableType.section, textAlign = TextAlign.Center, color = if (enabled) AppColors.TextPrimary else tint)
     }
 }

@@ -14,10 +14,18 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.mudlife.app.model.CampusBillCategory
@@ -32,7 +40,7 @@ import cn.mudlife.campuscard.*
 import java.time.LocalDate
 import java.time.YearMonth
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
 @Composable internal fun UnifiedBillsPage(campus: CampusViewModel, life: MainViewModel, lifeLoggedIn: Boolean, schoolLogin: () -> Unit,
     recharge: () -> Unit, pageInsets: PaddingValues = PaddingValues(0.dp)) {
     val context = LocalContext.current
@@ -209,9 +217,23 @@ import java.time.YearMonth
         PullRefreshIndicator(refreshing, pull, Modifier.align(Alignment.TopCenter).padding(top = pageInsets.calculateTopPadding()),
             backgroundColor = AppColors.Card)
     }
-    if (balanceOpen && hasBills) AlertDialog(onDismissRequest = { balanceOpen = false },
-        text = { CampusBalance(campus, { balanceOpen = false; schoolLogin() }, { balanceOpen = false; recharge() }) },
-        confirmButton = { TextButton(onClick = { balanceOpen = false }) { Text("关闭") } })
+    if (balanceOpen && hasBills) {
+        val dismiss = { balanceOpen = false }
+        ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            dragHandle = null, containerColor = AppColors.Card, contentColor = AppColors.TextPrimary) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(start = 22.dp, end = 22.dp, top = 10.dp, bottom = 20.dp)) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("校园卡", Modifier.weight(1f).semantics { heading() }, fontFamily = FontFamily.Serif,
+                        fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
+                    IconButton(onClick = dismiss) {
+                        Icon(Icons.Outlined.Close, "关闭", Modifier.size(21.dp), tint = AppColors.TextSecondary)
+                    }
+                }
+                CampusBalance(campus, { dismiss(); schoolLogin() }, { dismiss(); recharge() })
+            }
+        }
+    }
     detail?.let { bill -> AlertDialog(onDismissRequest = { detail = null }, title = { Text(bill.title) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(bill.fen?.takeUnless { it == Long.MIN_VALUE }?.let { "¥ ${Money.yuan(kotlin.math.abs(it))}" } ?: "金额未知", fontSize = 26.sp)
@@ -246,27 +268,64 @@ import java.time.YearMonth
 
 @Composable private fun CampusBalance(vm: CampusViewModel, login: () -> Unit, recharge: () -> Unit) {
     val context = LocalContext.current
-    Surface(color = AppColors.Card, shape = RoundedCornerShape(20.dp)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("校园卡余额", fontSize = 12.sp, color = AppColors.TextSecondary)
-                    Text(vm.currentCard?.balance(vm.config?.accountType.orEmpty())?.let { "¥ ${Money.yuan(it)}" } ?: "— —",
-                        fontSize = 30.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 7.dp))
+    val card = vm.currentCard
+    val signedIn = vm.hasSession && !vm.needsLogin
+    val balance = if (signedIn) card?.balance(vm.config?.accountType.orEmpty()) else null
+    val faceInk = if (AppColors.isDark) AppColors.TextPrimary else AppColors.OnAccent
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(shape = RoundedCornerShape(18.dp), color = if (AppColors.isDark) AppColors.ActiveBg else AppColors.Accent) {
+            Box {
+                Canvas(Modifier.matchParentSize()) {
+                    val center = Offset(size.width + 10.dp.toPx(), size.height + 25.dp.toPx())
+                    for (radius in listOf(66.dp, 84.dp, 102.dp)) {
+                        drawCircle(faceInk.copy(alpha = .11f), radius.toPx(), center, style = Stroke(1.dp.toPx()))
+                    }
                 }
-                if (!vm.hasSession || vm.needsLogin) Button(onClick = { HapticHelper.tick(context); login() }, shape = RoundedCornerShape(12.dp)) { Text("登录学校账号") }
-                else FilledTonalButton(onClick = { HapticHelper.tick(context); recharge() }, enabled = vm.currentCard?.blocked == false,
-                    shape = RoundedCornerShape(12.dp)) { Text("充值") }
-            }
-            if (vm.cards.size > 1) Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                vm.cards.forEach { card -> FilterChip(vm.currentCard?.account == card.account, onClick = { HapticHelper.tick(context); vm.selectCard(card.account) }, label = { Text(card.name) }) }
-            }
-            vm.error?.let {
-                TextButton(onClick = { HapticHelper.tick(context); if (vm.needsLogin) login() else vm.refresh() }, contentPadding = PaddingValues(0.dp)) {
-                    Text(if (vm.needsLogin) "学校登录已过期" else "余额刷新失败，点击重试", fontSize = 12.sp)
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.CreditCard, null, Modifier.size(18.dp), tint = faceInk)
+                        Spacer(Modifier.width(7.dp))
+                        Text(if (balance != null && vm.error != null) "卡内余额 · 上次同步" else "卡内余额",
+                            Modifier.weight(1f), fontSize = 13.sp, color = faceInk)
+                        if (signedIn && card != null && card.name.isNotBlank() && card.name != "校园卡") {
+                            Text(card.name, Modifier.widthIn(max = 126.dp).padding(start = 8.dp), color = faceInk,
+                                fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    if (balance != null) Text(buildAnnotatedString {
+                        withStyle(SpanStyle(fontSize = 22.sp)) { append("¥ ") }
+                        append(Money.yuan(balance))
+                    }, color = faceInk, fontSize = 38.sp, lineHeight = 45.sp, fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.Medium)
+                    else Text(when {
+                        vm.needsLogin -> "学校登录已过期"
+                        !vm.hasSession -> "未登录学校账号"
+                        vm.busy -> "正在获取余额"
+                        else -> "暂未获取余额"
+                    }, color = faceInk, fontSize = 20.sp, lineHeight = 29.sp)
                 }
             }
-            if (vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 10.dp))
+        }
+        if (signedIn && vm.cards.size > 1) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            vm.cards.forEach { choice -> FilterChip(card?.account == choice.account,
+                onClick = { HapticHelper.tick(context); vm.selectCard(choice.account) }, label = { Text(choice.name) }) }
+        }
+        if (vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (signedIn && vm.error != null) TextButton(onClick = { HapticHelper.tick(context); vm.refresh() }) {
+            Text("余额刷新失败，点击重试")
+        }
+        Button(onClick = { HapticHelper.tick(context); if (signedIn) recharge() else login() },
+            enabled = !signedIn || card?.blocked == false, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(
+                containerColor = AppColors.ActiveBg, contentColor = AppColors.Accent)) {
+            Icon(if (signedIn) Icons.Outlined.Add else Icons.Outlined.Login, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(7.dp))
+            Text(when {
+                !signedIn -> "登录学校账号"
+                card?.blocked == true -> "此卡暂不可充值"
+                else -> "充值"
+            })
         }
     }
 }

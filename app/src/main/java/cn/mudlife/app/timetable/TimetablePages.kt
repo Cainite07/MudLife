@@ -92,7 +92,7 @@ internal fun TimetablePages(
                                         .togetherWith(fadeOut(tween(90))).using(SizeTransform { _, _ -> tween(210) })
                                 }, label = "切换课表面板") { entry ->
                                 val height = when (entry.panel) {
-                                    TimetablePanel.Tools, is TimetablePanel.EditCourse -> null
+                                    TimetablePanel.Tools, TimetablePanel.AddWidget, is TimetablePanel.EditCourse -> null
                                     TimetablePanel.Display -> 330.dp
                                     is TimetablePanel.BellDetail, is TimetablePanel.Course, TimetablePanel.Wallpaper,
                                     TimetablePanel.NewTerm, TimetablePanel.Seasons -> 420.dp

@@ -96,11 +96,17 @@ internal fun RouteMotion(tab: Int, page: String, modifier: Modifier, content: @C
     var last by remember { mutableStateOf(route) }
     val previous = remember(route) { last }
     SideEffect { last = route }
+    val horizontal = previous.second.isEmpty() && page.isEmpty()
+    if (tab == 1 && page.isEmpty()) {
+        // The timetable's full-bleed wallpaper and its wash share the native image view.
+        // Translating that view uncovers a strip of the scaffold along the leading or trailing edge.
+        Box(modifier.fillMaxSize().clipToBounds()) { content() }
+        return
+    }
     val progress = remember(route) { Animatable(if (previous == route) 1f else 0f) }
     LaunchedEffect(progress) {
         if (progress.value < 1f) progress.animateTo(1f, tween(200, easing = LinearOutSlowInEasing))
     }
-    val horizontal = previous.second.isEmpty() && page.isEmpty()
     val direction = if (horizontal) tab.compareTo(previous.first) else if (page.isEmpty()) -1 else 1
     val readingOrder = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
     Box(modifier.fillMaxSize().clipToBounds()) {

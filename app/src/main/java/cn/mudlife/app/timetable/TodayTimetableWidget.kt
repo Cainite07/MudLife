@@ -1,6 +1,5 @@
 package cn.mudlife.app.timetable
 
-import android.app.Activity
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -13,7 +12,6 @@ import android.os.Bundle
 import android.util.SizeF
 import android.view.View
 import android.widget.RemoteViews
-import android.widget.Toast
 import cn.mudlife.app.R
 import cn.mudlife.campuscard.SessionStore
 import java.time.LocalDate
@@ -139,13 +137,13 @@ class TodayTimetableWidget : AppWidgetProvider() {
 
         fun refresh(context: Context) = context.sendBroadcast(refreshIntent(context))
 
-        fun pin(activity: Activity) {
-            val manager = AppWidgetManager.getInstance(activity)
-            val requested = runCatching {
-                manager.isRequestPinAppWidgetSupported && manager.requestPinAppWidget(component(activity), null, null)
-            }.getOrDefault(false)
-            if (!requested) Toast.makeText(activity, "长按桌面空白处，打开「小组件」并添加江大生活的「今日课表」", Toast.LENGTH_LONG).show()
-        }
+        fun supportsPin(context: Context): Boolean = runCatching {
+            AppWidgetManager.getInstance(context).isRequestPinAppWidgetSupported
+        }.getOrDefault(false)
+
+        fun requestPin(context: Context): Boolean = runCatching {
+            AppWidgetManager.getInstance(context).requestPinAppWidget(component(context), null, null)
+        }.getOrDefault(false)
 
         private fun midnight(context: Context): PendingIntent = PendingIntent.getBroadcast(
             context, 0, refreshIntent(context), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
