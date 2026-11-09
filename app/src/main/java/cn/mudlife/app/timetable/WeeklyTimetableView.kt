@@ -48,6 +48,12 @@ internal class WeeklyTimetableView(
     private val todayHeading = theme.Accent.toArgb()
     private val wideAxis = max(dp(38), (sp(10.5f) * 2.9f).roundToInt() + dp(6))
     private val narrowAxis = max(dp(28), (sp(14f) * 1.7f).roundToInt() + dp(4))
+    // Measure a Chinese course title with the same typeface and fallback fonts as a real card.
+    private val minimumRowHeight = text("课", COURSE_TITLE_SP, ink).apply {
+        typeface = courseTypeface
+        val natural = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        measure(natural, natural)
+    }.measuredHeight + 2 * dp(2) // Course cards have a 2dp outer inset at each edge.
     private var rowHeight = 0
     private val headers = LinearLayout(context)
     private val headerDivider = View(context).apply {
@@ -120,12 +126,8 @@ internal class WeeklyTimetableView(
         val count = (options.periodCount ?: naturalCount).coerceIn(1, TimetableLimits.MAX_PERIODS)
         val changedBackground = wallpaper != wallpaperVisible
         val changedDays = visibleDays != days
-        val minHeight = if (options.showBellTimes) (sp(14f) + 2 * sp(10.5f)) * 1.15f
-            else (sp(COURSE_TITLE_SP) + sp(COURSE_PLACE_SP)) * 1.2f + dp(7)
-        // Leave one line for the title and one per enabled detail even at large system font scales.
-        val detailLines = listOf(options.showPlace, options.showTeacher, options.showInactive).count { it }
-        val minimumCard = sp(COURSE_TITLE_SP) * 1.2f + detailLines * (sp(COURSE_PLACE_SP) * 1.2f + dp(1)) + dp(5)
-        val newRowHeight = maxOf(dp(options.rowHeightDp), minHeight.roundToInt(), minimumCard.roundToInt())
+        // At unusually large font scales reserve one readable title line, independently of optional details.
+        val newRowHeight = maxOf(dp(options.rowHeightDp), minimumRowHeight)
         val rebuildBody = renderedCount != count || changedDays || rowHeight != newRowHeight
         val changedTimes = showTimes != options.showBellTimes
         if (cardOptions.showGridLines != options.showGridLines) {
@@ -166,7 +168,10 @@ internal class WeeklyTimetableView(
         }
         val month = monday?.let { "${it.monthValue}月" } ?: "节次"
         if (monthLabel.text != month) monthLabel.text = month
-        if (rebuildBody) columns.removeAllViews()
+        if (rebuildBody) {
+            columns.removeAllViews()
+            columns.layoutParams = columns.layoutParams.apply { height = count * rowHeight }
+        }
         val changedBells = rebuildBody || axisStart != startTimes || axisEnd != endTimes || axisDetails != bellDetails
         if (changedBells || changedBackground || changedTimes) {
             axisStart = startTimes
@@ -260,21 +265,22 @@ internal class WeeklyTimetableView(
             for (period in 1..count) {
                 val time = startTimes[period].takeIf { showTimes }
                 val endTime = endTimes[period].takeIf { showTimes }
-                val row = LinearLayout(context).apply {
+                val row = CellTextLayout(context).apply {
                     orientation = VERTICAL
                     gravity = Gravity.CENTER
                     addView(text(period.toString(), 12f, muted).apply {
                         gravity = Gravity.CENTER
                         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+                        isSingleLine = true
                         setFontFeatureSettings("tnum")
-                    })
+                    }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1f))
                     for (mark in listOfNotNull(time, endTime).filter(String::isNotBlank)) {
                         addView(text(mark, 10.5f, muted).apply {
                             isSingleLine = true
                             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
                             gravity = Gravity.CENTER
                             setFontFeatureSettings("tnum")
-                        })
+                        }, DetailParams(1))
                     }
                     val detail = axisDetails[period].takeIf { showTimes }
                     contentDescription = if (detail != null) "第${period}节，$detail" else
@@ -356,16 +362,12 @@ internal class WeeklyTimetableView(
             cells = next
         }
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-            val minimum = count * rowHeight
-            val body = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY)
-                max(minimum, MeasureSpec.getSize(heightMeasureSpec)) else minimum
             for (i in 0 until childCount) {
                 val params = getChildAt(i).layoutParams as CellParams
-                val top = (params.first - 1) * body / count
-                params.topMargin = top + params.inset
-                params.height = params.last * body / count - top - 2 * params.inset
+                params.topMargin = (params.first - 1) * rowHeight + params.inset
+                params.height = (params.last - params.first + 1) * rowHeight - 2 * params.inset
             }
-            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(body, MeasureSpec.EXACTLY))
+            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(count * rowHeight, MeasureSpec.EXACTLY))
         }
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
@@ -384,7 +386,9 @@ internal class WeeklyTimetableView(
         }
     }
 
-    private class CourseCardLayout(context: Context) : LinearLayout(context) {
+    private class DetailParams(val lines: Int) : LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+
+    private class CellTextLayout(context: Context, private val preferredVerticalPadding: Int = 0) : LinearLayout(context) {
         private var lastWidthSpec = -1
         private var lastHeightSpec = -1
 
@@ -393,7 +397,29 @@ internal class WeeklyTimetableView(
             val contentLimit = MeasureSpec.makeMeasureSpec(height, MeasureSpec.AT_MOST)
             val title = getChildAt(0) as TextView
             if (lastWidthSpec != widthMeasureSpec || lastHeightSpec != heightMeasureSpec) {
-                if (title.maxLines != Int.MAX_VALUE) title.maxLines = Int.MAX_VALUE
+                // Keep the first line before allocating space to optional fields. All children have fixed text.
+                val width = getChildMeasureSpec(widthMeasureSpec, paddingLeft + paddingRight, LayoutParams.MATCH_PARENT)
+                val natural = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+                title.maxLines = 1
+                title.measure(width, natural)
+                val inset = minOf(preferredVerticalPadding, ((height - title.measuredHeight) / 2).coerceAtLeast(0))
+                if (paddingTop != inset) setPadding(paddingLeft, inset, paddingRight, inset)
+                var remaining = height - paddingTop - paddingBottom - title.measuredHeight
+                for (i in 1 until childCount) {
+                    val detail = getChildAt(i) as TextView
+                    val params = detail.layoutParams as DetailParams
+                    val available = remaining - params.topMargin
+                    detail.maxLines = params.lines
+                    detail.measure(width, natural)
+                    if (params.lines > 1 && detail.measuredHeight > available) {
+                        detail.maxLines = 1
+                        detail.measure(width, natural)
+                    }
+                    val fits = detail.measuredHeight <= available
+                    detail.visibility = if (fits) VISIBLE else GONE
+                    if (fits) remaining = available - detail.measuredHeight
+                }
+                title.maxLines = Int.MAX_VALUE
                 lastWidthSpec = widthMeasureSpec
                 lastHeightSpec = heightMeasureSpec
             }
@@ -457,14 +483,14 @@ internal class WeeklyTimetableView(
         }
         val clash = entries.size > 1
         val periods = end - start + 1
-        return CourseCardLayout(context).apply {
+        val verticalPadding = if (periods == 1 || rowHeight < dp(48)) dp(1) else dp(4)
+        return CellTextLayout(context, verticalPadding).apply {
             orientation = VERTICAL
             gravity = horizontalGravity or verticalGravity
             if (inactive) alpha = cardOptions.inactiveCardOpacity / 100f
             background = ripple(fill, cardOptions.cornerRadiusDp)
             outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
             clipToOutline = true
-            val verticalPadding = if (periods == 1 || rowHeight < dp(48)) dp(1) else dp(4)
             setPadding(dp(3), verticalPadding, dp(3), verticalPadding)
             val name = cardText(course.name, COURSE_TITLE_SP).apply {
                 ellipsize = TextUtils.TruncateAt.END
@@ -477,7 +503,7 @@ internal class WeeklyTimetableView(
                     maxLines = lines
                     ellipsize = TextUtils.TruncateAt.END
                     importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-                }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(1) })
+                }, DetailParams(lines).apply { topMargin = dp(1) })
             }
             if (clash) {
                 detail(if (inactive) "非本周 · ${entries.size}条" else "${entries.size}门重叠", 1)

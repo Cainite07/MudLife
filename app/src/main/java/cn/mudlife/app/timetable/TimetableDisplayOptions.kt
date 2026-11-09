@@ -106,7 +106,15 @@ internal fun DisplayGroupPanel(
                 MenuSection("课表网格") {
                     DisplaySwitch("显示网格线", options.showGridLines) { change(options.copy(showGridLines = it), TimetableFeedback.Toggle) }
                     DisplaySwitch("显示上下课时间", options.showBellTimes) { change(options.copy(showBellTimes = it), TimetableFeedback.Toggle) }
-                    DisplaySlider("课程格子高度", options.rowHeightDp, 40..96, { "$it dp" }) {
+                    DisplaySlider("课程格子高度", options.rowHeightDp, 40..96, { "$it dp" }, preview = { height ->
+                        Box(Modifier.padding(end = 8.dp).size(34.dp, 48.dp).clearAndSetSemantics {},
+                            contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(30.dp, (height / 2f).dp)
+                                .background(AppColors.ActiveBg, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
+                                Text("课", style = TimetableType.detail, color = AppColors.Accent)
+                            }
+                        }
+                    }) {
                         change(options.copy(rowHeightDp = it), null)
                     }
                 }

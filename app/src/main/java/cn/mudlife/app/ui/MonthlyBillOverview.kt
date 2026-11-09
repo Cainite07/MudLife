@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -255,12 +256,13 @@ private fun OneBillNote(notes: List<String>) {
     if (choices.isEmpty()) return
     val deck = remember(choices) { ArrayDeque(choices.shuffled()) }
     var current by remember(choices) { mutableStateOf(deck.removeFirst()) }
-    val opacity = remember(choices) { Animatable(1f) }
+    val arrivalOffset = remember(choices) { Animatable(0f) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(choices, lifecycle) {
         if (choices.size == 1) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            opacity.snapTo(1f)
+            val motionScale = coroutineContext[MotionDurationScale]
+            arrivalOffset.snapTo(0f)
             var deadline = SystemClock.uptimeMillis() + 10_000
             while (true) {
                 delay((deadline - SystemClock.uptimeMillis()).coerceAtLeast(0L))
@@ -270,9 +272,11 @@ private fun OneBillNote(notes: List<String>) {
                     if (refill.first() == current) Collections.swap(refill, 0, Random.nextInt(1, refill.size))
                     deck.addAll(refill)
                 }
-                opacity.animateTo(0f, tween(130))
                 current = deck.removeFirst()
-                opacity.animateTo(1f, tween(210))
+                if ((motionScale?.scaleFactor ?: 1f) > 0f) {
+                    arrivalOffset.snapTo(1f)
+                    arrivalOffset.animateTo(0f, tween(200))
+                }
             }
         }
     }
@@ -289,7 +293,7 @@ private fun OneBillNote(notes: List<String>) {
             }
             val height = with(LocalDensity.current) { heightPx.toDp() }
             Text(current, Modifier.fillMaxWidth().heightIn(min = height).wrapContentHeight(Alignment.CenterVertically)
-                .graphicsLayer { alpha = opacity.value }, style = style, color = AppColors.TextPrimary)
+                .graphicsLayer { translationY = 3.dp.toPx() * arrivalOffset.value }, style = style, color = AppColors.TextPrimary)
         }
     }
 }
