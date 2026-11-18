@@ -17,8 +17,8 @@ android {
         applicationId = "cn.mudlife.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 42
-        versionName = "1.5.1"
+        versionCode = 43
+        versionName = "1.5.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -50,7 +50,9 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".refresh"
+            val guidePreview = providers.gradleProperty("guidePreview").orNull == "true"
+            applicationIdSuffix = if (guidePreview) ".guidepreview" else ".refresh"
+            manifestPlaceholders["debugAppLabel"] = if (guidePreview) "江大生活·开场预览" else "@string/app_name"
             versionNameSuffix = "-refresh-preview"
         }
         release {
@@ -115,6 +117,7 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.process)
 
     // Network
     implementation(libs.retrofit)

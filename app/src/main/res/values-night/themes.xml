@@ -12,4 +12,9 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+    <style name="Theme.MudLife.Launch" parent="Theme.MudLife">
+        <item name="android:windowBackground">#181B19</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="s">#181B19</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@android:color/transparent</item>
+    </style>
 </resources>

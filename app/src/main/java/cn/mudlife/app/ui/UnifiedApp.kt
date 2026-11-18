@@ -8,11 +8,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -23,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Brush
@@ -33,12 +37,15 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import cn.mudlife.app.BuildConfig
 import cn.mudlife.app.ui.theme.*
 import cn.mudlife.app.utils.PrefsHelper
@@ -61,24 +68,68 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     var loggedIn by rememberSaveable { mutableStateOf(PrefsHelper.isLoggedIn) }
     var phone by rememberSaveable { mutableStateOf(PrefsHelper.telephone) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var guideEnabled by remember { mutableStateOf(PrefsHelper.accountGuideEnabled) }
+    val replayGuide = BuildConfig.DEBUG && activity.intent.getBooleanExtra("preview_account_guide", false)
+    var guidePresentation by remember { mutableIntStateOf(0) }
+    var showGuideLocation by rememberSaveable { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(when {
-        !PrefsHelper.accountGuideSeen && !loggedIn && !life.isQzhqLoggedIn && !campus.hasSession -> "setup"
+        replayGuide -> "setup"
+        guideEnabled && PrefsHelper.accountGuideInProgress -> "setup"
+        guideEnabled && !PrefsHelper.accountGuideSeen && !loggedIn && !life.isQzhqLoggedIn && !campus.hasSession -> "setup"
         campus.startupCode -> "card"
         else -> ""
     }) }
-    LaunchedEffect(Unit) {
-        if (page != "setup" && (loggedIn || life.isQzhqLoggedIn || campus.hasSession)) PrefsHelper.accountGuideSeen = true
+
+    val openPendingGuide = {
+        guideEnabled = PrefsHelper.accountGuideEnabled
+        if (guideEnabled && (page == "setup" || PrefsHelper.accountGuideInProgress)) {
+            guidePresentation = PrefsHelper.recordAccountGuidePresentation()
+            guideEnabled = PrefsHelper.accountGuideEnabled
+            page = "setup"
+        } else if (page == "setup") {
+            page = ""
+        }
     }
-    var loginBack by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        life.checkUpdateOnStartup()
+        if (replayGuide) {
+            activity.intent.removeExtra("preview_account_guide")
+            PrefsHelper.setAccountGuideEnabled(true)
+            guideEnabled = true
+        }
+        openPendingGuide()
+        if (page != "setup" && !PrefsHelper.accountGuideInProgress && !PrefsHelper.accountGuideSeen &&
+            (loggedIn || life.isQzhqLoggedIn || campus.hasSession)) {
+            PrefsHelper.accountGuideSeen = true
+            guideEnabled = PrefsHelper.accountGuideEnabled
+        }
+    }
+    DisposableEffect(Unit) {
+        val appLifecycle = ProcessLifecycleOwner.get().lifecycle
+        var returning = false
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> returning = true
+                Lifecycle.Event.ON_START -> if (returning) {
+                    returning = false
+                    if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) openPendingGuide()
+                }
+                else -> Unit
+            }
+        }
+        appLifecycle.addObserver(observer)
+        onDispose { appLifecycle.removeObserver(observer) }
+    }
+    var campusLogin by rememberSaveable { mutableStateOf(false) }
     var featureBack by rememberSaveable { mutableIntStateOf(2) }
     var rechargeBack by rememberSaveable { mutableStateOf("") }
-    val loginLife = { loginBack = page; page = "login" }
+    val loginLife = { campusLogin = true }
     val pageState = rememberSaveableStateHolder()
     var pending by remember { mutableStateOf(false) }
     var logout by remember { mutableStateOf("") }
     var account by remember { mutableStateOf("") }
     var showSchoolTestTools by rememberSaveable { mutableStateOf(false) }
-    var logisticsLogin by remember { mutableStateOf(false) }
+    var logisticsLogin by rememberSaveable { mutableStateOf(false) }
     var codesBack by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
     val school = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -88,7 +139,9 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
                 campus.confirmedPayment(it.data?.getStringExtra("payment_kind").orEmpty())
         } else if (campus.hasSession) campus.refresh()
     }
-    val loginSchool = { school.launch(Intent(activity, SchoolActivity::class.java)); Unit }
+    val loginSchool = {
+        school.launch(Intent(activity, SchoolActivity::class.java))
+    }
     val resetSchool = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == Activity.RESULT_OK) {
             campus.authenticated()
@@ -107,13 +160,20 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     DisposableEffect(lifecycle, campus, life) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> { foreground = true; campus.resume(); life.validateQzhqSession() }
+                Lifecycle.Event.ON_RESUME -> {
+                    foreground = true
+                    campus.resume()
+                    if (guideEnabled) life.validateQzhqSession()
+                }
                 Lifecycle.Event.ON_PAUSE -> { foreground = false; campus.pause() }
                 else -> Unit
             }
         }
         lifecycle.addObserver(observer)
-        if (foreground) { campus.resume(); life.validateQzhqSession() }
+        if (foreground) {
+            campus.resume()
+            if (guideEnabled) life.validateQzhqSession()
+        }
         onDispose { lifecycle.removeObserver(observer); campus.pause() }
     }
     LaunchedEffect(loggedIn, phone) { if (loggedIn) life.initManagers(activity.applicationContext) }
@@ -146,11 +206,31 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } }
     }
-    val finishSetup = { PrefsHelper.accountGuideSeen = true; page = "" }
+    val finishSetup: (Boolean) -> Unit = { completed ->
+        if (completed) {
+            PrefsHelper.completeAccountGuide()
+            guideEnabled = false
+        } else if (guidePresentation == 2) {
+            showGuideLocation = true
+        }
+        page = ""
+    }
+    val selectAccount: (String) -> Unit = {
+        when {
+            it == "school" && (!campus.hasSession || campus.needsLogin) -> loginSchool()
+            it == "life" && !loggedIn -> loginLife()
+            it == "logistics" && !life.isQzhqLoggedIn -> logisticsLogin = true
+            else -> account = it
+        }
+    }
+    val signedInAccounts = listOf(campus.hasSession && !campus.needsLogin, loggedIn, life.isQzhqLoggedIn).count { it }
+    val setGuideEnabled: (Boolean) -> Unit = { enabled ->
+        PrefsHelper.setAccountGuideEnabled(enabled)
+        guideEnabled = enabled
+    }
     val back = {
         when (page) {
-            "login" -> page = loginBack
-            "setup" -> finishSetup()
+            "setup" -> activity.finish()
             "codes", "bath", "dryer" -> page = codesBack
             "recharge" -> { page = rechargeBack; tab = featureBack }
             "electric" -> { page = ""; tab = featureBack }
@@ -170,23 +250,19 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             RouteMotion(tab, page, frame) {
             pageState.SaveableStateProvider(page.ifEmpty { "tab:$tab" }) {
             when {
-                page == "login" -> LoginScreen(onCampusCard = loginSchool, onBack = back, onLoginSuccess = {
-                    life.lifeAccountAuthenticated()
-                    phone = it; loggedIn = true; page = loginBack
-                })
+                page == "setup" -> {
+                    if (guidePresentation > 0) AccountGuide(
+                        school = campus.hasSession, campus = loggedIn, logistics = life.isQzhqLoggedIn,
+                        schoolExpired = campus.needsLogin, logisticsExpired = life.qzhqSessionExpired,
+                        presentation = guidePresentation, onSelect = selectAccount, onFinish = finishSetup
+                    )
+                }
                 page in setOf("codes", "bath", "dryer") -> Column {
                     PageTitle(when (page) { "bath" -> "洗浴使用码"; "dryer" -> "吹风机使用码"; else -> "使用码" }, back = { page = codesBack })
                     UserScreen(phone, onLogout = {}, viewModel = life, codesOnly = true, codeKind = if (page == "codes") "all" else page, onLifeLogin = loginLife)
                 }
-                page == "accounts" || page == "setup" -> AccountPage(loggedIn, life.isQzhqLoggedIn, campus.hasSession, campus.needsLogin, life.qzhqSessionExpired,
-                    setup = page == "setup", back = back, finish = finishSetup, openTestTools = { showSchoolTestTools = true }, select = {
-                        when {
-                            it == "school" && (!campus.hasSession || campus.needsLogin) -> loginSchool()
-                            it == "life" && !loggedIn -> loginLife()
-                            it == "logistics" && !life.isQzhqLoggedIn -> logisticsLogin = true
-                            else -> account = it
-                        }
-                    })
+                page == "accounts" -> AccountPage(loggedIn, life.isQzhqLoggedIn, campus.hasSession, campus.needsLogin,
+                    life.qzhqSessionExpired, back = back, openTestTools = { showSchoolTestTools = true }, select = selectAccount)
                 page == "electric" || page == "recharge" -> Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
                     PageTitle(if (page == "electric") "电费" else "校园卡充值", back = back, padded = false)
                     if (!campus.hasSession || campus.needsLogin) SchoolLogin(loginSchool)
@@ -243,10 +319,13 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
                     }
                 }
                 tab == 2 -> UnifiedBillsPage(campus, life, loggedIn, loginSchool, openRecharge,
+                    logisticsLogin = { logisticsLogin = true },
                     pageInsets = if (edgeRoot) insets else PaddingValues(0.dp))
-                else -> UnifiedProfile(campus, loginSchool, accounts = { page = "accounts" },
-                    electric = openElectric, codes = openCodes,
-                    checkingUpdate = life.isCheckingUpdate, checkUpdate = { life.checkUpdate(true) },
+                else -> UnifiedProfile(campus, accounts = { page = "accounts" },
+                    signedInAccounts = signedInAccounts,
+                    guideEnabled = guideEnabled, onGuideEnabled = setGuideEnabled,
+                    checkingUpdate = life.isCheckingUpdate, updateAvailable = life.updateInfo != null,
+                    checkUpdate = { life.checkUpdate(true) },
                     pageInsets = if (edgeRoot) insets else PaddingValues(0.dp))
             }
             }
@@ -256,6 +335,12 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
         }
     }
     AppUpdateDialog(life)
+    if (showGuideLocation) AlertDialog(
+        onDismissRequest = { showGuideLocation = false },
+        title = { Text("启动引导已关闭") },
+        text = { Text("以后可在「我的 → 偏好设置 → 启动引导」重新开启。") },
+        confirmButton = { TextButton(onClick = { showGuideLocation = false }) { Text("知道了") } }
+    )
     MudLifeToast(life.toastMessage, bottomSpacing = if (page.isEmpty() && !life.isShowering) 82.dp else 16.dp) { life.toastMessage = null }
     if (account.isNotEmpty()) {
         val selected = account
@@ -288,12 +373,18 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
         }) { Text("重置并重新登录", color = AppColors.Danger) } },
         dismissButton = { TextButton(onClick = { showSchoolTestTools = false }) { Text("关闭") } }
     )
-    if (logisticsLogin) QzhqLoginDialog(
+    if (campusLogin) CampusServiceLoginDialog(onDismiss = { campusLogin = false }, onLoginSuccess = {
+        life.lifeAccountAuthenticated()
+        phone = it
+        loggedIn = true
+    })
+    if (logisticsLogin) ServiceLoginDialog(
+        accountName = "趣智后勤热水",
         initialPhone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone },
         onDismiss = { logisticsLogin = false },
-        onPasswordSubmit = { number, password -> life.loginQzhq(number, password) { success, _ -> if (success) logisticsLogin = false } },
-        onSmsSubmit = { number, code -> life.smsLoginQzhq(number, code) { success, _ -> if (success) logisticsLogin = false } },
-        onSendSms = { number, sent -> life.sendQzhqSmsCode(number) { success, _ -> sent(success) } }
+        onPasswordSubmit = life::loginQzhq,
+        onSmsSubmit = life::smsLoginQzhq,
+        onSendSms = life::sendQzhqSmsCode
     )
     if (pending) AlertDialog(onDismissRequest = { pending = false }, title = { Text("有待核对的充值") }, text = {
         Column {
@@ -348,12 +439,17 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     }
 }
 
-@Composable internal fun SettingsRow(title: String, icon: ImageVector, trailing: String = "", action: () -> Unit) {
+@Composable internal fun SettingsRow(
+    title: String, icon: ImageVector, trailing: String = "", indicator: Boolean = false, action: () -> Unit
+) {
     val context = LocalContext.current
-    Row(Modifier.fillMaxWidth().clickable { HapticHelper.tick(context); action() }.heightIn(min = 55.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().clickable { HapticHelper.tick(context); action() }.heightIn(min = 55.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, Modifier.size(21.dp), tint = AppColors.TextPrimary)
         Text(title, Modifier.weight(1f).padding(start = 14.dp), fontSize = 15.sp)
         if (trailing.isNotEmpty()) Text(trailing, fontSize = 12.sp, color = AppColors.TextSecondary)
+        if (indicator) Box(Modifier.size(7.dp).background(AppColors.Success, CircleShape)
+            .semantics { contentDescription = "有新版本" })
         Icon(Icons.Outlined.ChevronRight, null, Modifier.padding(start = 7.dp).size(18.dp), tint = AppColors.TextSecondary)
     }
 }
@@ -364,8 +460,11 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     }
 }
 
-@Composable private fun UnifiedProfile(vm: CampusViewModel, login: () -> Unit, accounts: () -> Unit, electric: () -> Unit, codes: () -> Unit,
-    checkingUpdate: Boolean, checkUpdate: () -> Unit, pageInsets: PaddingValues) {
+@Composable private fun UnifiedProfile(
+    vm: CampusViewModel, accounts: () -> Unit, signedInAccounts: Int,
+    guideEnabled: Boolean, onGuideEnabled: (Boolean) -> Unit,
+    checkingUpdate: Boolean, updateAvailable: Boolean, checkUpdate: () -> Unit, pageInsets: PaddingValues
+) {
     val theme = LocalThemeReveal.current
     val context = LocalContext.current
     var feedback by remember { mutableStateOf(PrefsHelper.touchFeedback) }
@@ -378,35 +477,54 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(pageInsets).padding(horizontal = 22.dp).padding(bottom = 22.dp)) {
         PageTitle("我的", padded = false)
         val identity = vm.identity
-        if (identity != null) StudentCard(identity)
-        else if (!vm.hasSession) OutlinedButton(onClick = { HapticHelper.tick(context); login() }, modifier = Modifier.fillMaxWidth().height(74.dp), shape = RoundedCornerShape(20.dp)) { Text("登录学校账号 · 查看电子学生卡") }
-        else SettingsGroup {
-            Text("电子学生卡", fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp))
-            if (vm.identityBusy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 16.dp))
-            else TextButton(onClick = { HapticHelper.tick(context); if (vm.needsLogin) login() else vm.loadIdentity(true) }) { Text("加载电子学生卡") }
-            vm.identityError?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.error) }
+        if (identity != null && !vm.needsLogin) {
+            StudentCard(identity)
+            Spacer(Modifier.height(12.dp))
         }
-        SectionLabel("校园服务")
         SettingsGroup {
-            SettingsRow("账号管理", Icons.Outlined.ManageAccounts, action = accounts)
-            SettingsRow("电费", Icons.Outlined.Bolt, action = electric)
-            SettingsRow("使用码", Icons.Outlined.Key, action = codes)
+            SettingsRow("账号管理", Icons.Outlined.ManageAccounts,
+                if (signedInAccounts == 0) "未登录" else "$signedInAccounts 项已登录", action = accounts)
         }
         SectionLabel("偏好设置")
         SettingsGroup {
             SettingsRow("外观", Icons.Outlined.Palette, mode.label) { if (!theme.transitioning) appearance = true }
-            Row(Modifier.fillMaxWidth().heightIn(min = 55.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Vibration, null, Modifier.size(21.dp), tint = AppColors.TextPrimary)
-                Text("触感反馈", Modifier.weight(1f).padding(start = 14.dp), fontSize = 15.sp)
-                Switch(feedback, onCheckedChange = { feedback = it; PrefsHelper.touchFeedback = it; if (it) HapticHelper.tick(context) })
+            SettingsDivider()
+            ProfileToggle("启动引导", Icons.Outlined.PlayCircleOutline, guideEnabled) {
+                HapticHelper.tick(context)
+                onGuideEnabled(it)
+            }
+            SettingsDivider()
+            ProfileToggle("触感反馈", Icons.Outlined.Vibration, feedback) {
+                feedback = it
+                PrefsHelper.touchFeedback = it
+                if (it) HapticHelper.tick(context)
             }
         }
-        SectionLabel("项目支持")
+        SectionLabel("关于")
         SettingsGroup {
-            SettingsRow("检查更新", Icons.Outlined.SystemUpdate, if (checkingUpdate) "检查中…" else "", checkUpdate)
+            SettingsRow("检查更新", Icons.Outlined.SystemUpdate, if (checkingUpdate) "检查中…" else "",
+                indicator = updateAvailable, action = checkUpdate)
+            SettingsDivider()
             SettingsRow("GitHub", Icons.Outlined.Code) { UpdateManager.openBrowser(context, "https://github.com/Cainite07/MudLife") }
+            SettingsDivider()
             SettingsRow("Gitee", Icons.Outlined.Download) { UpdateManager.openBrowser(context, "https://gitee.com/cainite/MudLife") }
         }
+    }
+}
+
+@Composable private fun SettingsDivider() {
+    HorizontalDivider(Modifier.padding(start = 35.dp), color = AppColors.Border.copy(alpha = .6f))
+}
+
+@Composable private fun ProfileToggle(
+    title: String, icon: ImageVector, checked: Boolean, onChange: (Boolean) -> Unit
+) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 55.dp)
+        .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
+        .padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, Modifier.size(21.dp), tint = AppColors.TextPrimary)
+        Text(title, Modifier.weight(1f).padding(start = 14.dp, end = 8.dp), fontSize = 15.sp)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -451,10 +569,9 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
 @Composable private fun SectionLabel(text: String) { Text(text, fontSize = 12.sp, color = AppColors.TextSecondary, modifier = Modifier.padding(start = 14.dp, top = 20.dp, bottom = 8.dp)) }
 
 @Composable private fun AccountPage(life: Boolean, logisticsLoggedIn: Boolean, school: Boolean, schoolExpired: Boolean, logisticsExpired: Boolean,
-    setup: Boolean, back: () -> Unit, finish: () -> Unit, openTestTools: () -> Unit, select: (String) -> Unit) {
+    back: () -> Unit, openTestTools: () -> Unit, select: (String) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp)) {
-        PageTitle(if (setup) "欢迎使用江大生活" else "账号管理", if (setup) null else back, false)
-        if (setup) Text("按需登录，随时可以回来补充。", fontSize = 14.sp, color = AppColors.TextSecondary, modifier = Modifier.padding(bottom = 20.dp))
+        PageTitle("账号管理", back, false)
         SettingsGroup {
             AccountRow("学校账号", "付款码 · 余额 · 账单 · 电费", Icons.Outlined.School, school, schoolExpired) { select("school") }
             HorizontalDivider(color = AppColors.Border.copy(alpha = .5f))
@@ -462,27 +579,33 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             HorizontalDivider(color = AppColors.Border.copy(alpha = .5f))
             AccountRow("趣智后勤热水", "洗浴使用码", Icons.Outlined.Shower, logisticsLoggedIn, logisticsExpired) { select("logistics") }
         }
-        if (!setup && BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG) {
             Spacer(Modifier.height(20.dp))
-            SettingsGroup { SettingsRow("测试工具", Icons.Outlined.Build, "开发调试", openTestTools) }
-        }
-        if (setup) {
-            Button(onClick = finish, modifier = Modifier.fillMaxWidth().padding(top = 24.dp), shape = RoundedCornerShape(14.dp)) {
-                Text(if (school || life || logisticsLoggedIn) "开始使用" else "稍后登录")
-            }
+            SettingsGroup { SettingsRow("测试工具", Icons.Outlined.Build, "开发调试", action = openTestTools) }
         }
     }
 }
 
-@Composable private fun AccountRow(title: String, purpose: String, icon: ImageVector, connected: Boolean, expired: Boolean = false, action: () -> Unit) {
+@Composable internal fun AccountRow(title: String, purpose: String, icon: ImageVector, connected: Boolean,
+    expired: Boolean = false, enabled: Boolean = true, showProgress: Boolean = false, action: () -> Unit) {
     val context = LocalContext.current
-    Row(Modifier.fillMaxWidth().clickable { HapticHelper.tick(context); action() }.padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+    val signedIn = connected && !expired
+    val rowModifier = if (showProgress) {
+        val highlight by animateColorAsState(
+            if (signedIn) AppColors.ActiveBg else Color.Transparent, label = "accountLoginProgress")
+        Modifier.clip(RoundedCornerShape(12.dp)).background(highlight)
+    } else Modifier
+    Row(Modifier.fillMaxWidth().then(rowModifier).clickable(enabled = enabled) { HapticHelper.tick(context); action() }
+        .padding(horizontal = if (showProgress) 8.dp else 0.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, Modifier.size(23.dp), tint = AppColors.Accent)
         Column(Modifier.weight(1f).padding(horizontal = 13.dp)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
             Text(purpose, fontSize = 12.sp, color = AppColors.TextSecondary, modifier = Modifier.padding(top = 5.dp))
         }
-        Text(when { expired -> "重新登录"; connected -> "已登录"; else -> "去登录" }, fontSize = 12.sp, color = if (connected && !expired) AppColors.TextSecondary else AppColors.Accent)
-        Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp), tint = AppColors.TextSecondary)
+        Text(when { expired -> "重新登录"; signedIn -> "已登录"; else -> "去登录" }, fontSize = 12.sp,
+            color = if (signedIn && !showProgress) AppColors.TextSecondary else AppColors.Accent)
+        Icon(if (showProgress && signedIn) Icons.Outlined.Check else Icons.Outlined.ChevronRight, null,
+            Modifier.size(18.dp), tint = if (showProgress && signedIn) AppColors.Accent else AppColors.TextSecondary)
     }
 }

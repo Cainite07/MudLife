@@ -1,96 +1,59 @@
 package cn.mudlife.app.ui
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.mudlife.app.data.AuthRepository
-import cn.mudlife.app.model.LoginData
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 
 class LoginViewModel : ViewModel() {
-    var phone by mutableStateOf("")
-    var password by mutableStateOf("")
-    var smsCode by mutableStateOf("")
-    var loginMode by mutableStateOf("password")  // "password" | "sms"
+    private var busy = false
+    private var smsAvailableAt = 0L
 
-    var isLoading by mutableStateOf(false)
-        private set
-    var loginResult by mutableStateOf<Result<LoginData>?>(null)
-    var errorMessage by mutableStateOf<String?>(null)
-    var countdown by mutableStateOf(0)
-        private set
+    fun smsWaitSeconds(): Int =
+        ((smsAvailableAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L) + 999L).div(1000L).toInt()
 
-    fun login() {
-        if (phone.isBlank() || password.isBlank()) {
-            errorMessage = "请输入手机号和密码"
+    fun login(phone: String, password: String, result: (Boolean, String) -> Unit) =
+        submit("登录失败", result) { AuthRepository.login(phone, password) }
+
+    fun smsLogin(phone: String, code: String, result: (Boolean, String) -> Unit) =
+        submit("登录失败", result) { AuthRepository.smsLogin(phone, code) }
+
+    fun sendSmsCode(phone: String, result: (Boolean, String) -> Unit) {
+        if (smsWaitSeconds() > 0) {
+            result(false, "请等倒计时结束后重试")
             return
         }
-        if (isLoading) return
+        submit("验证码发送失败", result) {
+            AuthRepository.sendSmsCode(phone).onSuccess {
+                smsAvailableAt = SystemClock.elapsedRealtime() + 60_000L
+            }
+        }
+    }
+
+    private fun submit(fallback: String, onResult: (Boolean, String) -> Unit, request: suspend () -> Result<*>) {
+        if (busy) {
+            onResult(false, "请求正在处理，请稍候")
+            return
+        }
+        busy = true
         viewModelScope.launch {
-            isLoading = true
-            errorMessage = null
-            val result = AuthRepository.login(phone.trim(), password)
-            loginResult = result
-            if (result.isFailure) {
-                val msg = result.exceptionOrNull()?.message ?: "登录失败"
-                errorMessage = when {
-                    msg.contains("Unable to resolve host", ignoreCase = true) ||
-                    msg.contains("No address associated", ignoreCase = true) ||
-                    msg.contains("Network is unreachable", ignoreCase = true) -> "网络连接失败，请检查网络设置"
-                    msg.contains("timeout", ignoreCase = true) || msg.contains("timed out", ignoreCase = true) ->
-                        "连接超时，请检查网络后重试"
-                    else -> msg
+            try {
+                val response = request()
+                val message = response.exceptionOrNull()?.message.orEmpty()
+                val display = when {
+                    response.isSuccess -> ""
+                    message.contains("Unable to resolve host", ignoreCase = true) ||
+                        message.contains("No address associated", ignoreCase = true) ||
+                        message.contains("Network is unreachable", ignoreCase = true) -> "网络连接失败，请检查网络"
+                    message.contains("timeout", ignoreCase = true) || message.contains("timed out", ignoreCase = true) ->
+                        "连接超时，请重试"
+                    else -> message.ifBlank { fallback }
                 }
+                onResult(response.isSuccess, display)
+            } finally {
+                busy = false
             }
-            isLoading = false
         }
     }
-
-    fun sendSmsCode() {
-        if (phone.isBlank()) {
-            errorMessage = "请输入手机号"
-            return
-        }
-        if (isLoading || countdown > 0) return
-        viewModelScope.launch {
-            isLoading = true
-            errorMessage = null
-            val result = AuthRepository.sendSmsCode(phone.trim())
-            if (result.isSuccess) {
-                countdown = 60
-                launch {
-                    while (countdown > 0) {
-                        delay(1000)
-                        countdown--
-                    }
-                }
-            } else {
-                errorMessage = result.exceptionOrNull()?.message ?: "验证码发送失败"
-            }
-            isLoading = false
-        }
-    }
-
-    fun smsLogin() {
-        if (phone.isBlank() || smsCode.isBlank()) {
-            errorMessage = "请输入手机号和验证码"
-            return
-        }
-        if (isLoading) return
-        viewModelScope.launch {
-            isLoading = true
-            errorMessage = null
-            val result = AuthRepository.smsLogin(phone.trim(), smsCode.trim())
-            loginResult = result
-            if (result.isFailure) {
-                errorMessage = result.exceptionOrNull()?.message ?: "登录失败"
-            }
-            isLoading = false
-        }
-    }
-
-    fun resetResult() { loginResult = null }
 }

@@ -14,32 +14,30 @@ import cn.mudlife.app.ui.theme.AppColors
 
 @Composable
 fun ChangeUseCodeDialog(
-    phoneSuffix: String = "",
+    firstSetup: Boolean,
+    projectLabel: String,
+    busy: Boolean,
     onDismiss: () -> Unit,
-    onSubmit: (String) -> Unit
+    onSubmit: (String, (Boolean, String) -> Unit) -> Unit
 ) {
     var newCode by remember { mutableStateOf("") }
     var confirmCode by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf("") }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!busy) onDismiss() },
         shape = RoundedCornerShape(22.dp),
         containerColor = AppColors.SolidSurface,
         title = {
             Column {
                 Text(
-                    text = "修改浴室洗澡码",
+                    text = if (firstSetup) "设置洗浴使用码" else "修改洗浴使用码",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = AppColors.TextPrimary
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "设置前 5 位自定义码，后 3 位由系统动态随机分配",
-                    fontSize = 12.sp,
-                    color = AppColors.TextSecondary
-                )
+                if (projectLabel.isNotBlank()) Text(projectLabel, fontSize = 13.sp,
+                    color = AppColors.TextSecondary, modifier = Modifier.padding(top = 4.dp))
             }
         },
         text = {
@@ -47,14 +45,14 @@ fun ChangeUseCodeDialog(
                 OutlinedTextField(
                     value = newCode,
                     onValueChange = {
-                        if (it.length <= 5 && it.all { c -> c.isDigit() }) {
+                        if (it.length <= 5 && it.all { c -> c in '0'..'9' }) {
                             newCode = it
                             errorMsg = ""
                         }
                     },
                     label = { Text("新 5 位使用码") },
-                    placeholder = { Text("例如：58291") },
                     singleLine = true,
+                    enabled = !busy,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -65,13 +63,14 @@ fun ChangeUseCodeDialog(
                 OutlinedTextField(
                     value = confirmCode,
                     onValueChange = {
-                        if (it.length <= 5 && it.all { c -> c.isDigit() }) {
+                        if (it.length <= 5 && it.all { c -> c in '0'..'9' }) {
                             confirmCode = it
                             errorMsg = ""
                         }
                     },
                     label = { Text("再次输入确认") },
                     singleLine = true,
+                    enabled = !busy,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -86,33 +85,30 @@ fun ChangeUseCodeDialog(
                     )
                 }
 
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = "• 必须为 5 位纯数字\n• 不能有 3 位连续相同（如 111）\n• 不能有 3 位连续递增/递减（如 123、321）",
-                    color = AppColors.TextSecondary,
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp
-                )
+
             }
         },
         confirmButton = {
             Button(
+                enabled = !busy,
                 onClick = {
                     val validationError = validateCode(newCode, confirmCode)
                     if (validationError != null) {
                         errorMsg = validationError
                     } else {
-                        onSubmit(newCode)
+                        onSubmit(newCode) { success, message ->
+                            if (success) onDismiss() else errorMsg = message
+                        }
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.Accent)
             ) {
-                Text("提交修改")
+                Text(if (busy) "正在提交…" else "保存")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(enabled = !busy, onClick = onDismiss) {
                 Text("取消", color = AppColors.TextSecondary)
             }
         }

@@ -42,7 +42,7 @@ import java.time.YearMonth
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
 @Composable internal fun UnifiedBillsPage(campus: CampusViewModel, life: MainViewModel, lifeLoggedIn: Boolean, schoolLogin: () -> Unit,
-    recharge: () -> Unit, pageInsets: PaddingValues = PaddingValues(0.dp)) {
+    recharge: () -> Unit, logisticsLogin: () -> Unit, pageInsets: PaddingValues = PaddingValues(0.dp)) {
     val context = LocalContext.current
     val tap = { HapticHelper.tick(context) }
     // Preserve the month stored by the previous combined statement.
@@ -56,6 +56,7 @@ import java.time.YearMonth
     var selectedDay by rememberSaveable(owner, deviceOwner, period) { mutableStateOf<Int?>(null) }
     var categoryMenu by remember { mutableStateOf(false) }
     var balanceOpen by rememberSaveable { mutableStateOf(false) }
+    var logisticsBillsOpen by rememberSaveable { mutableStateOf(false) }
     var monthMenu by remember { mutableStateOf(false) }
     var detail by remember(campus.currentCard?.account) { mutableStateOf<Bill?>(null) }
     var limit by remember(period, category, selectedDay, owner, deviceOwner) { mutableIntStateOf(50) }
@@ -144,6 +145,12 @@ import java.time.YearMonth
                 }
             }
             if (!hasBills) item(key = "balance") { CampusBalance(campus, schoolLogin, recharge) }
+            item(key = "logisticsBills") {
+                TextButton(onClick = { tap(); logisticsBillsOpen = true }) {
+                    Text("后勤账单")
+                    Icon(Icons.Outlined.ChevronRight, null, Modifier.size(17.dp))
+                }
+            }
             if (hasBills) {
                 item(key = "summary") {
                     if (report != null) {
@@ -217,6 +224,9 @@ import java.time.YearMonth
         PullRefreshIndicator(refreshing, pull, Modifier.align(Alignment.TopCenter).padding(top = pageInsets.calculateTopPadding()),
             backgroundColor = AppColors.Card)
     }
+    if (logisticsBillsOpen) QzhqBillsSheet(life,
+        onLogin = { logisticsBillsOpen = false; logisticsLogin() },
+        onDismiss = { logisticsBillsOpen = false })
     if (balanceOpen && hasBills) {
         val dismiss = { balanceOpen = false }
         ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),

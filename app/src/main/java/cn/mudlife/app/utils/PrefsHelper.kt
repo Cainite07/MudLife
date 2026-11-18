@@ -20,6 +20,30 @@ object PrefsHelper {
         get() = prefs.getBoolean("accountGuideSeen", false)
         set(value) = prefs.edit().putBoolean("accountGuideSeen", value).apply()
 
+    val accountGuideEnabled: Boolean
+        get() = prefs.getBoolean("accountGuideEnabled", !accountGuideSeen || accountGuideInProgress)
+
+    val accountGuideInProgress: Boolean
+        get() = prefs.getBoolean("accountGuideInProgress", false)
+
+    fun setAccountGuideEnabled(enabled: Boolean) {
+        val edit = prefs.edit().putBoolean("accountGuideEnabled", enabled)
+        if (enabled) edit.putInt("accountGuidePresentations", 0).putBoolean("accountGuideInProgress", true)
+        edit.apply()
+    }
+
+    fun recordAccountGuidePresentation(): Int {
+        val number = prefs.getInt("accountGuidePresentations", 0).coerceIn(0, 1) + 1
+        prefs.edit().putInt("accountGuidePresentations", number).putBoolean("accountGuideInProgress", true)
+            .putBoolean("accountGuideEnabled", number < 2).apply()
+        return number
+    }
+
+    fun completeAccountGuide() {
+        prefs.edit().putBoolean("accountGuideSeen", true).putBoolean("accountGuideEnabled", false)
+            .remove("accountGuideInProgress").apply()
+    }
+
     fun init(context: Context) {
         val masterKey = try {
             MasterKey.Builder(context)
@@ -98,30 +122,39 @@ object PrefsHelper {
     var qzhqLoginCode: String get() = prefs.getString("qzhqLoginCode", "") ?: ""; set(v) = prefs.edit().putString("qzhqLoginCode", v).apply()
     var qzhqPhone: String get() = prefs.getString("qzhqPhone", "") ?: ""; set(v) = prefs.edit().putString("qzhqPhone", v).apply()
     var qzhqProjectId: String get() = prefs.getString("qzhqProjectId", "43") ?: "43"; set(v) = prefs.edit().putString("qzhqProjectId", v).apply()
-    var qzhqRandomCode: String get() = prefs.getString("qzhqRandomCode", "") ?: ""; set(v) = prefs.edit().putString("qzhqRandomCode", v).apply()
     var qzhqCustomCode: String
-        get() {
-            val key = bathPrefixKey() ?: return ""
-            if (!prefs.contains(key)) {
-                val legacy = prefs.getString("qzhqCustomCode", "").orEmpty()
-                if (cn.mudlife.app.model.BathCode.isPrefix(legacy)) {
-                    // Bind a legacy value to the current account exactly once.
-                    prefs.edit().putString(key, legacy).remove("qzhqCustomCode").commit()
-                }
-            }
-            return prefs.getString(key, "").orEmpty()
-        }
-        set(value) {
-            require(cn.mudlife.app.model.BathCode.isPrefix(value))
-            val key = bathPrefixKey() ?: return
-            // A completed save survives an immediate process kill.
-            prefs.edit().putString(key, value).commit()
-        }
+        get() = bathPrefix(qzhqProjectId)
+        set(value) { saveBathPrefix(qzhqProjectId, value) }
 
-    private fun bathPrefixKey(): String? = cn.mudlife.app.model.BathCode.storageKey(
-        qzhqPhone.ifEmpty { telephone }, qzhqProjectId
-    )
-    var qzhqStatus: Int get() = prefs.getInt("qzhqStatus", 1); set(v) = prefs.edit().putInt("qzhqStatus", v).apply()
+    fun bathPrefix(projectId: String): String {
+        if (projectId == qzhqProjectId) migrateBathPrefix()
+        val key = bathPrefixKey(projectId) ?: return ""
+        return prefs.getString(key, "").orEmpty()
+    }
+
+    fun migrateBathPrefix() {
+        val key = bathPrefixKey(qzhqProjectId) ?: return
+        val legacy = prefs.getString("qzhqCustomCode", "").orEmpty()
+        if (!cn.mudlife.app.model.BathCode.isPrefix(legacy)) return
+        val edit = prefs.edit().remove("qzhqCustomCode")
+        if (!prefs.contains(key)) edit.putString(key, legacy)
+        edit.commit()
+    }
+
+    fun saveBathPrefix(projectId: String, value: String): Boolean {
+        require(cn.mudlife.app.model.BathCode.isPrefix(value))
+        val key = bathPrefixKey(projectId) ?: return false
+        return prefs.edit().putString(key, value).commit()
+    }
+
+    fun forgetBathPrefix(projectId: String) {
+        val key = bathPrefixKey(projectId) ?: return
+        prefs.edit().remove(key).apply()
+    }
+
+    private fun bathPrefixKey(projectId: String): String? =
+        cn.mudlife.app.model.BathCode.storageKey(qzhqPhone.ifEmpty { telephone }, projectId)
+
     var qzhqSessionExpired: Boolean get() = prefs.getBoolean("qzhqSessionExpired", false); set(v) = prefs.edit().putBoolean("qzhqSessionExpired", v).apply()
     val isQzhqLoggedIn: Boolean get() = qzhqLoginCode.isNotEmpty() && !qzhqSessionExpired
 

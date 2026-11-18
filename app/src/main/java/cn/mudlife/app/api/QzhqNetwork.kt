@@ -3,6 +3,7 @@ package cn.mudlife.app.api
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import cn.mudlife.app.model.QzhqLoginData
+import cn.mudlife.app.model.QzhqProject
 import cn.mudlife.app.model.QzhqResponse
 import cn.mudlife.app.model.QzhqUseCodeData
 import cn.mudlife.app.utils.MD5Utils
@@ -135,16 +136,7 @@ object QzhqNetwork {
     suspend fun login(phone: String, passwordRaw: String): QzhqResponse<QzhqLoginData> {
         val encrypted = MD5Utils.encryptPassword(passwordRaw)
         val json = apiService.login(phone, encrypted).awaitString()
-        val resp = parse(json, QzhqLoginData::class.java)
-        if (resp.isSuccess && resp.data != null) {
-            resp.data.loginCode?.let { PrefsHelper.qzhqLoginCode = it }
-            PrefsHelper.qzhqSessionExpired = false
-            invalidSession.value = ""
-            PrefsHelper.qzhqPhone = phone
-            val pid = if (resp.data.projectId > 0) resp.data.projectId.toString() else "43"
-            PrefsHelper.qzhqProjectId = pid
-        }
-        return resp
+        return saveLogin(json, phone)
     }
 
     suspend fun sendVerifyCode(phone: String): QzhqResponse<Unit> {
@@ -156,80 +148,52 @@ object QzhqNetwork {
 
     suspend fun smsLogin(phone: String, smsCode: String): QzhqResponse<QzhqLoginData> {
         val json = apiService.smsLogin(phone = phone, msg = smsCode).awaitString()
+        return saveLogin(json, phone)
+    }
+
+    private suspend fun saveLogin(json: String, phone: String): QzhqResponse<QzhqLoginData> {
         val resp = parse(json, QzhqLoginData::class.java)
-        if (resp.isSuccess && resp.data != null) {
-            resp.data.loginCode?.let { PrefsHelper.qzhqLoginCode = it }
+        if (resp.isSuccess) {
+            val token = resp.data?.loginCode?.takeIf { it.isNotBlank() }
+                ?: return QzhqResponse(-1, "登录响应缺少会话，请重试")
+            val previousProject = PrefsHelper.qzhqProjectId.takeIf { phone == PrefsHelper.qzhqPhone }
+            PrefsHelper.migrateBathPrefix()
+            PrefsHelper.qzhqLoginCode = token
             PrefsHelper.qzhqSessionExpired = false
             invalidSession.value = ""
             PrefsHelper.qzhqPhone = phone
-            val pid = if (resp.data.projectId > 0) resp.data.projectId.toString() else "43"
-            PrefsHelper.qzhqProjectId = pid
+            PrefsHelper.qzhqProjectId = resp.data.projectId?.takeIf { it > 0 }?.toString()
+                ?: previousProject ?: QzhqService.PROJECT_ID
         }
         return resp
     }
 
-    suspend fun getWalletBillList(phone: String, loginCode: String): QzhqResponse<List<cn.mudlife.app.model.QzhqWalletBillItem>> {
-        val nowStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
-        val projectId = PrefsHelper.qzhqProjectId.ifEmpty { QzhqService.PROJECT_ID }
-        val allBills = mutableListOf<cn.mudlife.app.model.QzhqWalletBillItem>()
-        var curNum = 1
-        var lastError: String? = null
-        var lastErrorCode = 0
+    suspend fun getProjectGroup(projectId: String): QzhqResponse<List<QzhqProject>> =
+        parseList(apiService.getProjectGroup(projectId).awaitString(), QzhqProject::class.java)
 
-        while (curNum <= 5) {
-            try {
-                val json = apiService.getWalletBillList(
-                    phone = phone,
-                    loginCode = loginCode,
-                    projectId = projectId,
-                    endDate = nowStr,
-                    curNum = curNum
-                ).awaitString()
-                val pageResp = checkSession(parseList(json, cn.mudlife.app.model.QzhqWalletBillItem::class.java), loginCode)
-                if (pageResp.isSuccess) {
-                    val list = pageResp.data ?: emptyList()
-                    allBills.addAll(list)
-                    if (list.size < 20) {
-                        break
-                    }
-                    curNum++
-                } else {
-                    lastError = pageResp.message
-                    lastErrorCode = pageResp.errorCode
-                    cn.mudlife.app.utils.AppLogger.w("QzhqNet", "第 $curNum 页后勤账单获取失败: ${pageResp.message}")
-                    break
-                }
-            } catch (e: Exception) {
-                lastError = e.message
-                lastErrorCode = -1
-                cn.mudlife.app.utils.AppLogger.e("QzhqNet", "拉取第 $curNum 页后勤账单异常: ${e.message}")
-                break
-            }
-        }
-        return if (allBills.isNotEmpty()) {
-            cn.mudlife.app.utils.AppLogger.i("QzhqNet", "后勤账单加载完毕，共 ${allBills.size} 笔")
-            QzhqResponse(0, "成功", allBills)
-        } else {
-            QzhqResponse(lastErrorCode, lastError ?: "暂无记录", emptyList())
-        }
+    suspend fun getWalletBillList(
+        phone: String, loginCode: String, projectId: String, page: Int
+    ): QzhqResponse<List<cn.mudlife.app.model.QzhqWalletBillItem>> {
+        val now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"))
+        val endDate = now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        val json = apiService.getWalletBillList(phone = phone, loginCode = loginCode, projectId = projectId,
+            endDate = endDate, curNum = page).awaitString()
+        return checkSession(parseList(json, cn.mudlife.app.model.QzhqWalletBillItem::class.java), loginCode)
     }
 
-    suspend fun getUseCode(phone: String, loginCode: String): QzhqResponse<QzhqUseCodeData> {
-        val projectId = PrefsHelper.qzhqProjectId
+    suspend fun getUseCode(phone: String, loginCode: String, projectId: String): QzhqResponse<QzhqUseCodeData> {
         val json = apiService.getUseCode(phone = phone, projectId = projectId, loginCode = loginCode).awaitString()
         val resp = checkSession(parse(json, QzhqUseCodeData::class.java), loginCode)
         return resp
     }
 
-    suspend fun updateUseCodeStatus(status: Int, phone: String, loginCode: String): QzhqResponse<Unit> {
-        val projectId = PrefsHelper.qzhqProjectId
+    suspend fun updateUseCodeStatus(status: Int, phone: String, loginCode: String, projectId: String): QzhqResponse<Unit> {
         val json = apiService.updateUseCodeStatus(status = status, phone = phone, projectId = projectId, loginCode = loginCode).awaitString()
         val resp = checkSession(parse(json, Unit::class.java), loginCode)
         return resp
     }
 
-    suspend fun setUseCode(code: String, phone: String, loginCode: String): QzhqResponse<Unit> {
-        val projectId = PrefsHelper.qzhqProjectId
+    suspend fun setUseCode(code: String, phone: String, loginCode: String, projectId: String): QzhqResponse<Unit> {
         val json = apiService.setUseCode(securityCode = code, phone = phone, projectId = projectId, loginCode = loginCode).awaitString()
         return checkSession(parse(json, Unit::class.java), loginCode)
     }

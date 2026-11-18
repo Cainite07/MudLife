@@ -1,11 +1,9 @@
 package cn.mudlife.app.timetable
 
 import android.net.Uri
-import android.webkit.WebViewClient
 
-/** The registrar's public entry and the same application behind the university's WebVPN. */
+/** The registrar's application behind the university's WebVPN. */
 internal object TeachingRoutes {
-    const val DIRECT = "https://jwxt.ujs.edu.cn"
     const val VPN = "https://webvpn.ujs.edu.cn/"
     const val PROXIED = VPN + "http/77726476706e69737468656265737421fae0598869256243300d8db9d6562d"
     private const val SSO_PATH = "/sso/jziotlogin"
@@ -18,24 +16,32 @@ internal object TeachingRoutes {
     fun course(base: String) = base + COURSE_MENU
     fun isGatewayLogin(uri: Uri) = uri.toString() == VPN + "login"
 
-    fun gatewaySession(): String = Uri.parse("https://pass.ujs.edu.cn/cas/login").buildUpon()
+    fun isGatewayCallback(uri: Uri): Boolean = isGatewayOrigin(uri) && when (uri.path) {
+        "/login" -> uri.getQueryParameter("cas_login") == "true"
+        "/wengine-vpn-token-login" -> !uri.getQueryParameter("token").isNullOrBlank()
+        else -> false
+    }
+
+    fun isGatewayPortal(uri: Uri): Boolean = isGatewayOrigin(uri) && uri.path in setOf("/", "/m/portal")
+
+    private fun isGatewayOrigin(uri: Uri) =
+        uri.scheme == "https" && uri.host == "webvpn.ujs.edu.cn" && uri.userInfo == null && uri.port in setOf(-1, 443)
+
+    fun schoolGatewayLogin(): String = Uri.parse("https://pass.ujs.edu.cn/cas/login").buildUpon()
         .appendQueryParameter("service", VPN + "login?cas_login=true")
-        .appendQueryParameter("gateway", "true")
         .build().toString()
 
     data class Page(val base: String, val path: String) {
         val isLogin get() = path.startsWith("/xtgl/login")
         val isTeachingHomeCandidate get() = path.startsWith("/xtgl/") && !path.contains("login", ignoreCase = true)
 
-        val isAcademic get() = base == DIRECT ||
-            base.substringAfterLast('/').equals(PROXIED.substringAfterLast('/'), ignoreCase = true)
+        val isAcademic get() = base.substringAfterLast('/').equals(PROXIED.substringAfterLast('/'), ignoreCase = true)
     }
 
     fun page(uri: Uri): Page? {
         if (uri.scheme != "https" || uri.userInfo != null || uri.port !in setOf(-1, 443)) return null
         val path = uri.encodedPath ?: return null
         return when (uri.host) {
-            "jwxt.ujs.edu.cn" -> Page(DIRECT, path)
             "webvpn.ujs.edu.cn" -> proxyPath.matchEntire(path)?.let { Page(VPN.dropLast(1) + it.groupValues[1], it.groupValues[2]) }
             else -> null
         }
@@ -53,7 +59,7 @@ internal object TeachingRoutes {
         return null
     }
 
-    fun initial(saved: String?) = bookmark(saved) ?: login(DIRECT)
+    fun initial(saved: String?) = bookmark(saved) ?: login(PROXIED)
 
     fun courseFromHome(uri: Uri): String? =
         page(uri)?.takeIf { it.isTeachingHomeCandidate && it.isAcademic }?.let { course(it.base) }
@@ -61,13 +67,6 @@ internal object TeachingRoutes {
     fun expiredBookmarkLogin(uri: Uri, expectedBase: String?): String? =
         page(uri)?.takeIf { it.isLogin && it.base == expectedBase }?.let { login(it.base) }
 
-    // Only the empty public entry may be replaced on an HTTPS-to-HTTP redirect.
-    fun isPublicDowngrade(attempt: String?, target: Uri) =
-        attempt == login(DIRECT) && target.toString() == "http://jwxt.ujs.edu.cn$SSO_PATH"
-
-    fun isConnectionFailure(attempt: String?, request: Uri, code: Int) =
-        attempt != null && attempt == request.toString() && page(request)?.base == DIRECT &&
-            code in setOf(WebViewClient.ERROR_HOST_LOOKUP, WebViewClient.ERROR_CONNECT, WebViewClient.ERROR_TIMEOUT)
 }
 
 /** Tracks one teaching-system visit, including authentication that returns through WebVPN. */
@@ -93,10 +92,7 @@ internal class TeachingLanding {
         val page = TeachingRoutes.page(uri)
         if (uri.path?.endsWith("/cas/login") == true) {
             val service = uri.getQueryParameter("service")?.let(Uri::parse) ?: return
-            // The school's CAS may name its direct HTTP service even when this WebView only loads HTTPS.
-            val directHttpService = service.scheme == "http" && service.host == "jwxt.ujs.edu.cn" &&
-                service.userInfo == null && service.port in setOf(-1, 80)
-            enteredTeachingLogin = directHttpService || TeachingRoutes.page(service)?.isAcademic == true
+            enteredTeachingLogin = TeachingRoutes.page(service)?.isAcademic == true
             authProxyBase = page?.base.takeIf { enteredTeachingLogin }
         } else if (page?.isAcademic == true && (page.path == "/sso/jziotlogin" || page.isLogin)) {
             enteredTeachingLogin = true
@@ -119,5 +115,5 @@ internal class TeachingLanding {
     }
 
     private fun isSchoolOrigin(uri: Uri) = uri.scheme == "https" && uri.userInfo == null &&
-        uri.port in setOf(-1, 443) && uri.host in setOf("jwxt.ujs.edu.cn", "webvpn.ujs.edu.cn", "pass.ujs.edu.cn")
+        uri.port in setOf(-1, 443) && uri.host in setOf("webvpn.ujs.edu.cn", "pass.ujs.edu.cn")
 }

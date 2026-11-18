@@ -16,6 +16,7 @@ import cn.mudlife.app.api.downRateResultSafe
 import cn.mudlife.app.api.getBillListSafe
 import cn.mudlife.app.api.getUserProjectsSafe
 import cn.mudlife.app.api.getDeviceInfoSafe
+import cn.mudlife.app.api.QzhqNetwork
 import cn.mudlife.app.api.getUseCodeSafe
 import cn.mudlife.app.api.setUseCodeSafe
 import cn.mudlife.app.api.updateUseCodeStatusSafe
@@ -23,6 +24,9 @@ import cn.mudlife.app.api.generateUseCodeSafe
 import cn.mudlife.app.api.getWalletSafe
 import cn.mudlife.app.api.queryUsingSafe
 import cn.mudlife.app.model.ActiveOrder
+import cn.mudlife.app.model.BathCode
+import cn.mudlife.app.model.QzhqProject
+import cn.mudlife.app.model.QzhqUseCodeData
 import cn.mudlife.app.model.UseCodeData
 import cn.mudlife.app.model.DeviceInfo
 import cn.mudlife.app.model.MqttOrderMsg
@@ -129,27 +133,29 @@ class MainViewModel(
         private set
     var updateError by mutableStateOf<String?>(null); private set
 
-    // ── 后勤热水使用码 (江大专区) ──
-    var qzhqUseCodeData by mutableStateOf<cn.mudlife.app.model.QzhqUseCodeData?>(
-        if (PrefsHelper.qzhqRandomCode.isNotEmpty()) {
-            cn.mudlife.app.model.QzhqUseCodeData(
-                randomCode = PrefsHelper.qzhqRandomCode,
-                useCodeStatus = PrefsHelper.qzhqStatus
-            )
-        } else null
-    )
+    var qzhqUseCodeData by mutableStateOf<QzhqUseCodeData?>(null)
+        private set
     var qzhqSessionExpired by mutableStateOf(PrefsHelper.qzhqSessionExpired)
         private set
     var isQzhqLoggedIn by mutableStateOf(PrefsHelper.isQzhqLoggedIn)
+        private set
     var qzhqLoading by mutableStateOf(false)
-    var qzhqPrefix by mutableStateOf(PrefsHelper.qzhqCustomCode)
+        private set
+    var qzhqCodeError by mutableStateOf<String?>(null)
+        private set
+    var qzhqProjectId by mutableStateOf(PrefsHelper.qzhqProjectId)
+        private set
+    var qzhqProjects by mutableStateOf<List<QzhqProject>>(emptyList())
+        private set
+    var qzhqProjectsError by mutableStateOf(false)
+        private set
+    var qzhqPrefix by mutableStateOf("")
         private set
 
     fun rememberQzhqPrefix(value: String) {
-        if (!cn.mudlife.app.model.BathCode.isPrefix(value)) return
-        PrefsHelper.qzhqCustomCode = value
-        qzhqPrefix = PrefsHelper.qzhqCustomCode
-        toastMessage = if (qzhqPrefix == value) "已记住前五位，关闭应用后仍保留" else "请先登录后勤账号后再保存"
+        if (!isQzhqLoggedIn || qzhqUseCodeData?.isSet != true || !BathCode.isPrefix(value)) return
+        if (PrefsHelper.saveBathPrefix(qzhqProjectId, value)) qzhqPrefix = value
+        else toastMessage = "前五位保存失败，请重试"
     }
 
     fun initManagers(context: Context) {
@@ -1100,31 +1106,43 @@ class MainViewModel(
         }
     }
 
-    // ── 国内免翻墙检查更新方法 ──
+    private var checkedAtStartup = false
+    private var manualUpdateRequested = false
+
+    fun checkUpdateOnStartup() {
+        if (checkedAtStartup) return
+        checkedAtStartup = true
+        checkUpdate()
+    }
+
     fun checkUpdate(isManual: Boolean = false) {
-        if (isCheckingUpdate) return
-        if (isManual) {
-            toastMessage = "正在检测更新..."
+        if (isManual && updateInfo != null) {
+            showUpdateDialog = true
+            return
         }
+        if (isManual) manualUpdateRequested = true
+        if (isCheckingUpdate) return
+        isCheckingUpdate = true
         viewModelScope.launch {
-            isCheckingUpdate = true
             try {
                 val result = cn.mudlife.app.utils.UpdateManager.checkUpdate()
-                if (result.isSuccess) {
-                    val info = result.getOrNull()
-                    if (info != null && info.hasUpdate) {
-                        updateInfo = info
-                        showUpdateDialog = true
-                    } else if (isManual) {
-                        toastMessage = if (info != null && info.versionCode < cn.mudlife.app.BuildConfig.VERSION_CODE) "当前安装版高于已发布版本" else "当前已是最新版本"
-                    }
-                } else if (isManual) {
+                val info = result.getOrNull()
+                if (info?.hasUpdate == true) {
+                    updateInfo = info
+                    if (manualUpdateRequested) showUpdateDialog = true
+                } else if (manualUpdateRequested && info != null) {
+                    toastMessage = if (info.versionCode < cn.mudlife.app.BuildConfig.VERSION_CODE)
+                        "当前安装版高于已发布版本" else "当前已是最新版本"
+                } else if (manualUpdateRequested) {
                     toastMessage = "检测更新失败，请检查网络后重试"
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
-                if (isManual) toastMessage = "检测更新异常"
+                if (manualUpdateRequested) toastMessage = "检测更新失败，请稍后重试"
             } finally {
                 isCheckingUpdate = false
+                manualUpdateRequested = false
             }
         }
     }
@@ -1168,12 +1186,13 @@ class MainViewModel(
     }
 
     // ── 后勤洗浴使用码控制 (江大专区) ──
-    private var bathValidationJob: Job? = null
+    private var bathCodeJob: Job? = null
+    private var bathProjectsJob: Job? = null
     private var bathCheckedAt = 0L
 
     init {
         viewModelScope.launch {
-            cn.mudlife.app.api.QzhqNetwork.invalidSessions.collect { token ->
+            QzhqNetwork.invalidSessions.collect { token ->
                 if (token.isNotBlank() && token == PrefsHelper.qzhqLoginCode && PrefsHelper.qzhqSessionExpired) {
                     qzhqSessionExpired = true
                     isQzhqLoggedIn = false
@@ -1184,117 +1203,160 @@ class MainViewModel(
     }
 
     fun validateQzhqSession() {
-        if (!PrefsHelper.isQzhqLoggedIn || bathValidationJob?.isActive == true) return
+        if (!PrefsHelper.isQzhqLoggedIn || bathCodeJob?.isActive == true) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (bathCheckedAt != 0L && now - bathCheckedAt < 60_000L) return
         bathCheckedAt = now
-        bathValidationJob = loadQzhqUseCode()
+        loadQzhqUseCode()
     }
 
     fun logoutQzhq() {
-        bathRequests.invalidate(); bathLoginJob?.cancel(); qzhqLoading = false
+        bathLoginJob?.cancel()
         PrefsHelper.qzhqLoginCode = ""
-        PrefsHelper.qzhqRandomCode = ""
+        PrefsHelper.qzhqSessionExpired = false
         isQzhqLoggedIn = false
         qzhqSessionExpired = false
-        PrefsHelper.qzhqSessionExpired = false
-        bathCheckedAt = 0L
-        qzhqUseCodeData = null
-        qzhqPrefix = ""
+        resetBathSelection()
     }
 
-    fun loadQzhqUseCode(): Job {
-        qzhqPrefix = PrefsHelper.qzhqCustomCode
-        val phone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }
-        val loginCode = PrefsHelper.qzhqLoginCode
+    private fun resetBathSelection() {
+        bathRequests.invalidate()
+        bathCheckedAt = 0L
+        qzhqProjectId = PrefsHelper.qzhqProjectId
+        qzhqProjects = emptyList()
+        qzhqProjectsError = false
+        qzhqLoading = false
+        qzhqUseCodeData = null
+        qzhqPrefix = ""
+        qzhqCodeError = null
+    }
 
-        return bathRequests.launch {
-            qzhqLoading = true
+    fun loadQzhqProjects() {
+        if (!isQzhqLoggedIn || qzhqProjects.isNotEmpty() || bathProjectsJob?.isActive == true) return
+        val homeProject = PrefsHelper.qzhqProjectId
+        qzhqProjectsError = false
+        bathProjectsJob = bathRequests.launch {
             try {
-                val resp = request { cn.mudlife.app.api.QzhqNetwork.getUseCode(phone, loginCode) }
-                if (PrefsHelper.qzhqLoginCode != loginCode) return@launch
-                if (resp.isSuccess && resp.data != null) {
-                    saveBathCode(resp.data)
-                    qzhqUseCodeData = resp.data
-                    qzhqPrefix = PrefsHelper.qzhqCustomCode
-                } else if (resp.isSessionExpired) {
-                    qzhqLoading = false
-                    isQzhqLoggedIn = false
-                    qzhqSessionExpired = true
-                    qzhqUseCodeData = null
-                }
-            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {
-            } finally {
-                if (isCurrent) qzhqLoading = false
+                val response = request { QzhqNetwork.getProjectGroup(homeProject) }
+                qzhqProjects = if (response.isSuccess) response.data.orEmpty()
+                    .filter { it.id > 0 && it.label.isNotBlank() }.distinctBy { it.id } else emptyList()
+                qzhqProjectsError = qzhqProjects.isEmpty()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                qzhqProjectsError = true
             }
         }
     }
 
-    fun toggleQzhqStatus(newStatus: Int) {
-        val phone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }
-        val loginCode = PrefsHelper.qzhqLoginCode
-        if (phone.isEmpty() || loginCode.isEmpty()) {
-            toastMessage = "请先登录后勤专区"
-            return
-        }
+    fun selectQzhqProject(projectId: String) {
+        if (!isQzhqLoggedIn || qzhqLoading || projectId == qzhqProjectId ||
+            qzhqProjects.none { it.id.toString() == projectId }) return
+        qzhqProjectId = projectId
+        qzhqUseCodeData = null
+        qzhqPrefix = ""
+        loadQzhqUseCode()
+    }
 
-        bathRequests.launch {
-            try {
-                val resp = request { cn.mudlife.app.api.QzhqNetwork.updateUseCodeStatus(newStatus, phone, loginCode) }
-                if (resp.isSuccess) {
-                    PrefsHelper.qzhqStatus = newStatus
-                    qzhqUseCodeData = qzhqUseCodeData?.copy(useCodeStatus = newStatus)
-                        ?: cn.mudlife.app.model.QzhqUseCodeData(randomCode = PrefsHelper.qzhqRandomCode, useCodeStatus = newStatus)
-                    toastMessage = if (newStatus == 1) "洗澡码已开启" else "洗澡码已关闭"
-                } else {
-                    toastMessage = resp.message.ifEmpty { "操作失败" }
-                }
-            } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {
-                toastMessage = "网络请求失败，请检查网络"
+    fun loadQzhqUseCode(): Job {
+        if (!isQzhqLoggedIn) return Job().apply { complete() }
+        return runBathCodeRequest { phone, loginCode, projectId ->
+            refreshBathCode(phone, loginCode, projectId)
+        }
+    }
+
+    fun toggleQzhqStatus(newStatus: Int) {
+        if (!isQzhqLoggedIn || qzhqLoading || qzhqUseCodeData?.isSet != true) return
+        runBathCodeRequest { phone, loginCode, projectId ->
+            val response = request { QzhqNetwork.updateUseCodeStatus(newStatus, phone, loginCode, projectId) }
+            if (response.isSuccess) {
+                qzhqUseCodeData = qzhqUseCodeData?.copy(useCodeStatus = newStatus)
+                toastMessage = if (newStatus == 1) "洗澡码已开启" else "洗澡码已关闭"
+            } else {
+                toastMessage = response.message.ifEmpty { "操作失败" }
             }
         }
     }
 
     fun setQzhqUseCode(newCode5: String, onComplete: (Boolean, String) -> Unit) {
+        if (!isQzhqLoggedIn || qzhqLoading || qzhqUseCodeData == null || qzhqCodeError != null) return
+        runBathCodeRequest { phone, loginCode, projectId ->
+            val response = try {
+                request { QzhqNetwork.setUseCode(newCode5, phone, loginCode, projectId) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                PrefsHelper.forgetBathPrefix(projectId)
+                qzhqUseCodeData = null
+                qzhqPrefix = ""
+                refreshBathCode(phone, loginCode, projectId)
+                onComplete(false, "暂未确认提交结果，请核对该区使用码")
+                return@runBathCodeRequest
+            }
+            if (!response.isSuccess) {
+                onComplete(false, response.message.ifEmpty { "设置失败" })
+                return@runBathCodeRequest
+            }
+            PrefsHelper.saveBathPrefix(projectId, newCode5)
+            qzhqUseCodeData = null
+            qzhqPrefix = ""
+            val synced = refreshBathCode(phone, loginCode, projectId, newCode5)
+            val message = if (synced) "使用码已保存" else "提交成功，暂未确认使用码"
+            toastMessage = message
+            onComplete(true, message)
+        }
+    }
+
+    private fun runBathCodeRequest(
+        block: suspend AccountRequests.Request.(String, String, String) -> Unit
+    ): Job {
+        bathCodeJob?.takeIf { it.isActive }?.let { return it }
         val phone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }
         val loginCode = PrefsHelper.qzhqLoginCode
-        if (phone.isEmpty() || loginCode.isEmpty()) {
-            onComplete(false, "请先登录后勤专区")
-            return
-        }
-
-        bathRequests.launch {
+        val projectId = qzhqProjectId
+        qzhqLoading = true
+        return bathRequests.launch {
             try {
-                val resp = request { cn.mudlife.app.api.QzhqNetwork.setUseCode(newCode5, phone, loginCode) }
-                if (resp.isSuccess) {
-                    PrefsHelper.qzhqCustomCode = newCode5
-                    qzhqPrefix = newCode5
-                    val codeResp = request { cn.mudlife.app.api.QzhqNetwork.getUseCode(phone, loginCode) }
-                    if (codeResp.isSuccess && codeResp.data != null) saveBathCode(codeResp.data)
-                    val random3 = if (codeResp.isSuccess && codeResp.data != null && !codeResp.data.randomCode.isNullOrEmpty()) {
-                        codeResp.data.randomCode!!
-                    } else {
-                        PrefsHelper.qzhqRandomCode
-                    }
-                    val fullCode = newCode5 + random3
-                    qzhqUseCodeData = cn.mudlife.app.model.QzhqUseCodeData(
-                        randomCode = random3,
-                        useCodeStatus = qzhqUseCodeData?.useCodeStatus ?: 1
-                    )
-                    PrefsHelper.qzhqRandomCode = random3
-                    toastMessage = "洗澡码修改成功：$fullCode"
-                    onComplete(true, "修改成功")
-                } else {
-                    val msg = resp.message.ifEmpty { "设置失败" }
-                    toastMessage = msg
-                    onComplete(false, msg)
-                }
-            } catch (cancelled: CancellationException) { throw cancelled } catch (e: Exception) {
-                val msg = "网络连接异常，请重试"
-                toastMessage = msg
-                onComplete(false, msg)
+                block(phone, loginCode, projectId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                toastMessage = "网络请求失败，请重试"
+            } finally {
+                if (isCurrent) qzhqLoading = false
             }
+        }.also { bathCodeJob = it }
+    }
+
+    private suspend fun AccountRequests.Request.refreshBathCode(
+        phone: String, loginCode: String, projectId: String, submittedPrefix: String? = null
+    ): Boolean {
+        qzhqCodeError = null
+        val response = try {
+            request { QzhqNetwork.getUseCode(phone, loginCode, projectId) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            qzhqUseCodeData = null
+            qzhqCodeError = "使用码暂时无法加载"
+            return false
         }
+        val data = response.data
+        if (!response.isSuccess || data == null) {
+            qzhqUseCodeData = null
+            qzhqCodeError = response.message.ifBlank { "使用码暂时无法加载" }
+            return false
+        }
+        if (submittedPrefix != null && BathCode.complete(data.randomCode, submittedPrefix)
+                ?.startsWith(submittedPrefix) != true) {
+            qzhqCodeError = "暂未确认新使用码"
+            return false
+        }
+        data.randomCode?.takeIf { it.matches(Regex("[0-9]{8}")) }
+            ?.let { PrefsHelper.saveBathPrefix(projectId, it.take(5)) }
+        qzhqPrefix = if (data.isSet) submittedPrefix ?: PrefsHelper.bathPrefix(projectId) else ""
+        qzhqUseCodeData = data
+        return true
     }
 
     fun loginQzhq(phone: String, passwordRaw: String, onComplete: (Boolean, String) -> Unit) {
@@ -1303,12 +1365,12 @@ class MainViewModel(
             try {
                 val resp = cn.mudlife.app.api.QzhqNetwork.login(phone, passwordRaw)
                 if (resp.isSuccess && resp.data != null) {
-                    bathRequests.invalidate()
+                    resetBathSelection()
                     isQzhqLoggedIn = true
                     qzhqSessionExpired = false
-                    bathCheckedAt = 0L
                     loadQzhqUseCode()
-                    toastMessage = "后勤专区登录成功，已同步洗澡码"
+                    loadQzhqProjects()
+                    toastMessage = "趣智后勤热水已登录"
                     onComplete(true, "登录成功")
                 } else {
                     val msg = resp.message.ifEmpty { "登录失败，请核对手机号或密码" }
@@ -1329,12 +1391,12 @@ class MainViewModel(
             try {
                 val resp = cn.mudlife.app.api.QzhqNetwork.smsLogin(phone, smsCode)
                 if (resp.isSuccess && resp.data != null) {
-                    bathRequests.invalidate()
+                    resetBathSelection()
                     isQzhqLoggedIn = true
                     qzhqSessionExpired = false
-                    bathCheckedAt = 0L
                     loadQzhqUseCode()
-                    toastMessage = "后勤专区登录成功，已同步洗澡码"
+                    loadQzhqProjects()
+                    toastMessage = "趣智后勤热水已登录"
                     onComplete(true, "登录成功")
                 } else {
                     val msg = resp.message.ifEmpty { "登录失败，请核对手机号或验证码" }
@@ -1384,12 +1446,6 @@ class MainViewModel(
                 work.joinAll()
             } finally { if (generation == refreshGeneration) isRefreshing = false }
         }
-    }
-
-    private fun saveBathCode(data: cn.mudlife.app.model.QzhqUseCodeData) {
-        data.randomCode?.let { PrefsHelper.qzhqRandomCode = it }
-        data.randomCode?.takeIf { it.matches(Regex("[0-9]{8}")) }?.let { PrefsHelper.qzhqCustomCode = it.take(5) }
-        PrefsHelper.qzhqStatus = data.useCodeStatus
     }
 
     private fun syncProjectAccounts(): Job = lifeRequests.launch {

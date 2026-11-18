@@ -1,5 +1,6 @@
 package cn.mudlife.app.model
 
+import com.google.gson.Gson
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -25,5 +26,16 @@ class BathCodeTest {
     @Test fun explicit13579PrefixIsValidAndMustNotBePurgedOnStartup() {
         assertTrue(BathCode.isPrefix("13579"))
         assertEquals("13579789", BathCode.complete("789", "13579"))
+    }
+
+    @Test fun noServerCodeIsUnsetEvenWhenThisProjectHasAnOldLocalPrefix() {
+        val gson = Gson()
+        val unset = gson.fromJson("""{"useCodeStatus":0,"randomCode":null}""", QzhqUseCodeData::class.java)
+        val disabled = gson.fromJson("""{"useCodeStatus":0,"randomCode":"009"}""", QzhqUseCodeData::class.java)
+        assertFalse(unset.isSet)
+        assertNull(BathCode.complete(unset.randomCode, "00123"))
+        assertTrue(disabled.isSet)
+        assertEquals(0, disabled.useCodeStatus)
+        assertEquals("00123009", BathCode.complete(disabled.randomCode, "00123"))
     }
 }

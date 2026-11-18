@@ -1,6 +1,7 @@
 package cn.mudlife.campuscard
 
 import cn.mudlife.app.BuildConfig
+import cn.mudlife.app.ui.PageTitle
 
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
@@ -22,7 +23,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -54,11 +54,7 @@ class SchoolActivity : ComponentActivity() {
     private var loginPhase by mutableStateOf("连接校园卡入口")
     private var phaseSince = SystemClock.elapsedRealtime()
     private var phaseSeconds by mutableIntStateOf(0)
-    private enum class CardPage(val message: String) {
-        LOADING("正在加载校园卡网页"),
-        EMPTY("校园卡网页已载入，暂未显示内容"),
-        VISIBLE("校园卡网页已打开，正在确认登录")
-    }
+    private enum class CardPage { LOADING, EMPTY, VISIBLE }
     private var cardPage by mutableStateOf<CardPage?>(null)
     private var cardAssetFailed by mutableStateOf(false)
     private var observedEmptyCard by mutableStateOf(false)
@@ -101,27 +97,26 @@ class SchoolActivity : ComponentActivity() {
             androidx.activity.compose.BackHandler { close() }
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Column(Modifier.fillMaxSize().systemBarsPadding()) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-                        TextButton(onClick = ::close) { Text("返回") }
-                        Text(if (electric) "电费充值" else if (payment) "校园卡充值" else "学校认证", fontFamily = FontFamily.Serif, fontSize = 19.sp, modifier = Modifier.weight(1f).padding(top = 11.dp))
-                    }
+                    PageTitle(if (electric) "电费充值" else if (payment) "校园卡充值" else "登录学校账号",
+                        back = ::close)
                     if (!payment) {
-                        if (cardLogin) {
-                            val message = if (cardAssetFailed && cardPage != CardPage.VISIBLE) "校园卡网页资源加载失败" else cardPage?.message ?: loginPhase
-                            Text("$message · 已停留 ${phaseSeconds} 秒", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 24.dp, bottom = 8.dp))
-                            if (cardPage == CardPage.LOADING && !failure && !cardAssetFailed)
-                                LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp))
-                            if (failure || manualRecovery)
-                                TextButton(onClick = ::continueCardLogin, modifier = Modifier.padding(start = 12.dp)) { Text("重新连接校园卡") }
-                        } else Text("认证成功后会安全记住登录", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 24.dp, bottom = 12.dp))
-                        if (failure) { Text(stage, Modifier.padding(24.dp)); if (!cardLogin) TextButton(onClick = { failure = false; browser.loadUrl(loginUrl()) }) { Text("重新连接") } }
+                        if (failure || cardAssetFailed || manualRecovery) {
+                            if (cardAssetFailed) Text("校园卡页面加载失败", fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 24.dp))
+                            TextButton(onClick = ::continueCardLogin, modifier = Modifier.padding(start = 12.dp)) {
+                                Text("重新连接校园卡")
+                            }
+                        } else if (cardPage == CardPage.LOADING) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp))
+                        }
+                        if (failure) Text(stage, Modifier.padding(24.dp))
                         else Box(Modifier.fillMaxWidth().weight(1f)) {
                             AndroidView(factory = { browser }, modifier = Modifier.fillMaxSize())
                             if (cardLogin && observedEmptyCard && phaseSeconds >= 3 && !manualRecovery) {
                                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                                     CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 2.dp)
-                                    Text(if (recovery.automaticAttempted) "已自动重新连接，正在等待校园卡"
-                                        else "正在等待校园卡", Modifier.padding(top = 12.dp),
+                                    Text("正在加载校园卡", Modifier.padding(top = 12.dp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }

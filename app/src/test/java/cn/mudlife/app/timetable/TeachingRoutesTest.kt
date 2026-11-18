@@ -1,7 +1,6 @@
 package cn.mudlife.app.timetable
 
 import android.net.Uri
-import android.webkit.WebViewClient
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -11,14 +10,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], manifest = Config.NONE)
 class TeachingRoutesTest {
-    private val direct = TeachingRoutes.DIRECT
+    private val direct = "https://jwxt.ujs.edu.cn"
     private val proxied = TeachingRoutes.PROXIED
 
     @Test fun firstEntryAndExistingBookmarks() {
-        assertEquals("https://jwxt.ujs.edu.cn/sso/jziotlogin", TeachingRoutes.initial(null))
+        assertEquals(TeachingRoutes.login(proxied), TeachingRoutes.initial(null))
         val saved = TeachingRoutes.course(proxied)
         assertEquals(saved, TeachingRoutes.initial(saved + "&term=old"))
-        assertEquals(TeachingRoutes.login(direct), TeachingRoutes.initial(TeachingRoutes.login(proxied)))
+        assertEquals(TeachingRoutes.login(proxied), TeachingRoutes.initial(TeachingRoutes.course(direct)))
     }
 
     @Test fun importsOnlyFromTheOpenAcademicRouteForTheCurrentStudent() {
@@ -26,14 +25,15 @@ class TeachingRoutesTest {
         val unknown = TeachingRoutes.course(TeachingRoutes.VPN + "http/1234567890abcdef")
         val directPage = TeachingRoutes.course(direct)
         assertNull(TeachingRoutes.bookmark(unknown))
-        assertEquals(TeachingRoutes.login(direct), TeachingRoutes.initial(unknown))
-        for (base in listOf(direct, proxied, alternate)) {
+        assertEquals(TeachingRoutes.login(proxied), TeachingRoutes.initial(unknown))
+        for (base in listOf(proxied, alternate)) {
             val page = TeachingRoutes.course(base)
             assertNull(TeachingRoutes.importSourceError(page, page + "&term=1", "student-A", "student-A"))
             assertNotNull(TeachingRoutes.importSourceError(page, page, "student-A", "student-B"))
             assertNotNull(TeachingRoutes.importSourceError(page, page, "", ""))
         }
-        assertNotNull(TeachingRoutes.importSourceError(directPage, TeachingRoutes.course(proxied), "A", "A"))
+        assertNotNull(TeachingRoutes.importSourceError(directPage, directPage, "A", "A"))
+        assertNotNull(TeachingRoutes.importSourceError(TeachingRoutes.course(proxied), TeachingRoutes.course(alternate), "A", "A"))
         assertNotNull(TeachingRoutes.importSourceError(directPage, unknown, "A", "A"))
         assertNotNull(TeachingRoutes.importSourceError(unknown, unknown, "A", "A"))
     }
@@ -41,67 +41,65 @@ class TeachingRoutesTest {
     @Test fun courseFollowsConfirmedHome() {
         fun from(base: String) =
             TeachingRoutes.courseFromHome(Uri.parse("$base/xtgl/index_initMenu.html"))
-        assertEquals(TeachingRoutes.course(direct), from(direct))
+        assertNull(from(direct))
         assertEquals(TeachingRoutes.course(proxied), from(proxied))
         val alternatePrefix = proxied.replace("/http/", "/https-8443/")
         assertEquals(TeachingRoutes.course(alternatePrefix), from(alternatePrefix))
         assertNull(from(TeachingRoutes.VPN + "http/1234567890abcdef"))
-        assertNull(TeachingRoutes.courseFromHome(Uri.parse("$direct/xtgl/login_slogin.html")))
+        assertNull(TeachingRoutes.courseFromHome(Uri.parse("$proxied/xtgl/login_slogin.html")))
     }
 
     @Test fun expiredCourseReentersSameSystemOnly() {
         fun next(base: String, previous: String?) =
             TeachingRoutes.expiredBookmarkLogin(Uri.parse("$base/xtgl/login_slogin.html"), previous)
-        assertEquals(TeachingRoutes.login(direct), next(direct, direct))
+        assertNull(next(direct, direct))
         assertEquals(TeachingRoutes.login(proxied), next(proxied, proxied))
         assertNull(next(proxied, direct))
-        assertNull(next(direct, null))
+        assertNull(next(proxied, null))
     }
 
-    @Test fun fallbackOnlyForUnrenderedDirectEntry() {
-        val entry = TeachingRoutes.login(direct)
-        val http = Uri.parse(entry.replace("https:", "http:"))
-        assertTrue(TeachingRoutes.isPublicDowngrade(entry, http))
-        assertFalse(TeachingRoutes.isPublicDowngrade(entry, http.buildUpon().appendQueryParameter("next", "menu").build()))
-        assertFalse(TeachingRoutes.isPublicDowngrade(entry, http.buildUpon().fragment("menu").build()))
-        assertFalse(TeachingRoutes.isPublicDowngrade(null, http))
-        val request = Uri.parse(entry)
-        assertTrue(TeachingRoutes.isConnectionFailure(entry, request, WebViewClient.ERROR_CONNECT))
-        assertFalse(TeachingRoutes.isConnectionFailure(null, request, WebViewClient.ERROR_TIMEOUT))
-        assertFalse(TeachingRoutes.isConnectionFailure(entry, Uri.parse("https://pass.ujs.edu.cn/cas/login"), WebViewClient.ERROR_TIMEOUT))
-        assertFalse(TeachingRoutes.isConnectionFailure(entry, request, WebViewClient.ERROR_FAILED_SSL_HANDSHAKE))
-    }
-
-    @Test fun silentSessionIsForTheGatewayLoginOnly() {
+    @Test fun gatewayLoginUsesSchoolAuthenticationInsteadOfWebVpnPassword() {
         assertTrue(TeachingRoutes.isGatewayLogin(Uri.parse(TeachingRoutes.VPN + "login")))
         assertFalse(TeachingRoutes.isGatewayLogin(Uri.parse(TeachingRoutes.VPN)))
         assertFalse(TeachingRoutes.isGatewayLogin(Uri.parse(TeachingRoutes.VPN + "login?cas_login=true")))
         assertFalse(TeachingRoutes.isGatewayLogin(Uri.parse("$proxied/cas/login")))
-        val gateway = Uri.parse(TeachingRoutes.gatewaySession())
+        val gateway = Uri.parse(TeachingRoutes.schoolGatewayLogin())
+        assertEquals("pass.ujs.edu.cn", gateway.host)
         assertEquals("https://webvpn.ujs.edu.cn/login?cas_login=true", gateway.getQueryParameter("service"))
-        assertEquals("true", gateway.getQueryParameter("gateway"))
+        assertNull(gateway.getQueryParameter("gateway"))
+    }
+
+    @Test fun gatewayCallbackSupportsTokenLoginAndMobilePortal() {
+        val vpn = TeachingRoutes.VPN
+        assertTrue(TeachingRoutes.isGatewayCallback(Uri.parse(vpn + "login?cas_login=true")))
+        assertTrue(TeachingRoutes.isGatewayCallback(Uri.parse(vpn + "wengine-vpn-token-login?token=sample")))
+        assertFalse(TeachingRoutes.isGatewayCallback(Uri.parse(vpn + "wengine-vpn-token-login?token=")))
+        assertFalse(TeachingRoutes.isGatewayCallback(Uri.parse("https://example.org/wengine-vpn-token-login?token=sample")))
+        assertTrue(TeachingRoutes.isGatewayPortal(Uri.parse(vpn)))
+        assertTrue(TeachingRoutes.isGatewayPortal(Uri.parse(vpn + "m/portal")))
+        assertFalse(TeachingRoutes.isGatewayPortal(Uri.parse(vpn + "m/portal-other")))
     }
 
     private fun casPage(casBase: String, service: String): Uri =
         Uri.parse("$casBase/cas/login").buildUpon().appendQueryParameter("service", service).build()
 
-    @Test fun directLoginRecoversOnlyOnce() {
+    @Test fun teachingLoginRecoversOnlyOnce() {
         val landing = TeachingLanding()
-        val signIn = casPage("https://pass.ujs.edu.cn", TeachingRoutes.login(direct))
-        val missing = Uri.parse("$direct/error/404")
-        assertNull(landing.missingPageTarget(missing, direct))
+        val signIn = casPage("https://pass.ujs.edu.cn", TeachingRoutes.login(proxied))
+        val missing = Uri.parse("$proxied/error/404")
+        assertNull(landing.missingPageTarget(missing, proxied))
         landing.observe(signIn)
         assertTrue(landing.pending)
-        assertEquals(TeachingRoutes.course(direct), landing.missingPageTarget(missing, direct))
+        assertEquals(TeachingRoutes.course(proxied), landing.missingPageTarget(missing, proxied))
         assertTrue(landing.consume())
         assertFalse(landing.consume())
         landing.observe(signIn)
-        assertNull(landing.missingPageTarget(missing, direct))
+        assertNull(landing.missingPageTarget(missing, proxied))
 
         landing.reset()
-        assertNull(landing.missingPageTarget(missing, direct))
+        assertNull(landing.missingPageTarget(missing, proxied))
         landing.observe(signIn)
-        assertEquals(TeachingRoutes.course(direct), landing.missingPageTarget(missing, direct))
+        assertEquals(TeachingRoutes.course(proxied), landing.missingPageTarget(missing, proxied))
     }
 
     @Test fun proxyKeepsTheTeachingRoute() {
@@ -120,7 +118,7 @@ class TeachingRoutesTest {
     @Test fun vpnLoginDoesNotArmCourseRecovery() {
         val landing = TeachingLanding()
         landing.observe(Uri.parse(TeachingRoutes.VPN + "login"))
-        landing.observe(Uri.parse(TeachingRoutes.gatewaySession()))
+        landing.observe(Uri.parse(TeachingRoutes.schoolGatewayLogin()))
         assertNull(landing.missingPageTarget(Uri.parse("$proxied/error/404"), proxied))
         assertNull(landing.missingPageTarget(Uri.parse(TeachingRoutes.VPN + "404"), proxied))
     }

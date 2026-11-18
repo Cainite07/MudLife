@@ -26,6 +26,13 @@ interface QzhqService {
         @Field("version") version: String = "5.0.0"
     ): Call<ResponseBody>
 
+    @GET("/combination/user/group/project/list")
+    fun getProjectGroup(
+        @Query("projectId") projectId: String,
+        @Query("phoneSystem") phoneSystem: String = "WeChat",
+        @Query("version") version: String = "5.0.0"
+    ): Call<ResponseBody>
+
     /**
      * 查询后勤洗浴使用码
      */

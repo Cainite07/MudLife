@@ -22,10 +22,17 @@ data class QzhqResponse<T>(
 data class QzhqLoginData(
     @SerializedName("loginCode") val loginCode: String? = null,
     @SerializedName("telPhone") val telPhone: String? = null,
-    @SerializedName("projectId") val projectId: Int = 816,
+    @SerializedName("projectId") val projectId: Int? = null,
     @SerializedName("studentNo") val studentNo: String? = null,
     @SerializedName("name") val name: String? = null
 )
+
+data class QzhqProject(
+    @SerializedName("projectId") val id: Int,
+    @SerializedName("projectName") val name: String?
+) {
+    val label: String get() = name.orEmpty().removePrefix("江苏大学洗浴")
+}
 
 /**
  * 后勤使用码实体
@@ -35,4 +42,6 @@ data class QzhqUseCodeData(
     @SerializedName("randomCode") val randomCode: String? = null,
     /** 状态：1 = 已开启，0 = 已关闭 */
     @SerializedName("useCodeStatus") val useCodeStatus: Int = 0
-)
+) {
+    val isSet: Boolean get() = !randomCode.isNullOrBlank()
+}

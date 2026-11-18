@@ -4,7 +4,7 @@
 
 <h1 align="center">江大生活 · Jiangda Life</h1>
 <p align="center"><b>校园日常，放在一起。</b><br>江苏大学一卡通 · 本科教务课表 · 趣智校园 · 趣智后勤热水</p>
-<p align="center">v1.5.1 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
+<p align="center">v1.5.2 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
 
 <p align="center">
   <a href="https://gitee.com/cainite/MudLife/releases"><b>Gitee 国内下载</b></a> &emsp;
@@ -39,7 +39,7 @@
     </td>
     <td width="50%" valign="top">
       <h3>我的 · 管理服务</h3>
-      <p>账号管理、电子学生卡、本部宿舍电费。<br>外观、触感与应用更新。</p>
+      <p>账号管理、外观、启动引导与触感反馈。<br>检查更新及项目源码。</p>
     </td>
   </tr>
 </table>
@@ -50,15 +50,15 @@
 
 - **学校账号** — 校园卡付款码、余额、账单、充值、电费、电子学生卡与本科教务课表。教务系统可能要求再次认证。
 - **趣智校园** — 饮水机与吹风机使用码。
-- **趣智后勤热水** — 洗浴使用码。
+- **趣智后勤热水** — 按洗浴分区查看或设置使用码，以及查看对应消费记录。
 
-首次安装有可跳过的引导，也可以在“我的 → 账号管理”随时补充。三个账号独立保存，未登录的服务提供对应入口。“我的 → 外观”可选跟随系统、浅色或深色。
+首次安装时会显示可跳过的账号引导，默认最多展示两次。可在「我的 → 偏好设置」重新开启，也可在「我的 → 账号管理」按需登录。外观可选跟随系统、浅色或深色。
 
 学校服务依赖校方系统与网络；需要微信的支付流程会进入相应环境，返回后核对原订单结果。在线付款码不替代 NFC 校园卡。
 
 ## 导入与编辑课表
 
-打开底栏「课表」，点右上角「更多功能 → 教务同步」，进入学校本科教务。应用读取个人课表后会列出待导入课程，核对学期和课程再点「确认导入」。也可以新建空白学期，从头添加课程。导入后的课程可以在本机修改。
+打开底栏「课表」，点右上角「更多功能 → 教务同步」，通过学校 WebVPN 进入本科教务。会话失效时按学校页面提示完成登录。应用读取个人课表后会列出待导入课程，核对学期和课程再点「确认导入」。也可以新建空白学期，从头添加课程。导入后的课程可以在本机修改。
 
 ## 生活账单，一目了然
 
@@ -72,7 +72,7 @@
 
 ## 下载与覆盖升级
 
-国内网络优先使用 [Gitee 发行版](https://gitee.com/cainite/MudLife/releases)，也可从 [GitHub Releases](https://github.com/Cainite07/MudLife/releases) 下载。两端提供相同 APK 与 SHA-256 校验文件；应用内更新并行连接 Gitee 与 GitHub，使用先收到有效数据的源，并保留备用源。
+国内网络优先使用 [Gitee 发行版](https://gitee.com/cainite/MudLife/releases)，也可从 [GitHub Releases](https://github.com/Cainite07/MudLife/releases) 下载。两端提供相同 APK 与 SHA-256 校验文件；应用启动时自动检查更新，发现新版后会在「我的 → 检查更新」显示绿点。
 
 正式版包名为 `cn.mudlife.app`，沿用固定签名，正常覆盖升级保留本机登录和保存的数据。**1.3.18 之前的旧签名版本不能直接覆盖升级**；切换前请保存所需信息，卸载旧包会清除其数据。
 
@@ -85,7 +85,7 @@ Kotlin 2.0.21 · Compose / Material 3 · Retrofit / OkHttp · MQTT · CameraX / 
 ./gradlew assembleRelease
 ```
 
-正式版仅打包 **ARM64（arm64-v8a）**，文件名为 `MudLife-1.5.1.apk`，内置离线扫码模型。
+正式版仅打包 **ARM64（arm64-v8a）**，文件名为 `MudLife-1.5.2.apk`，内置离线扫码模型。
 
 正式构建需要维护者已有的固定签名，私钥与凭据不在仓库中。详见 [签名说明](signing/README.md) · [双平台发布](docs/RELEASING.md) · [宣传图制作](assets/promo/prompts.md)。
 

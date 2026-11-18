@@ -1,11 +1,11 @@
 {
-  "versionCode": 42,
-  "versionName": "1.5.1",
-  "releaseDate": "2026-11-09",
-  "title": "江大生活 · Jiangda Life v1.5.1",
-  "changelog": "· 账单新增月报，直接展示每日支出柱状图、日历与分类占比；生活小记在本机按规则生成，每 10 秒切换，不调用 AI 服务。\n· 改善深色模式的页面、课程卡片和底栏层次，保持文字与背景清晰。\n· 修复生活小记切换时短暂空白、课表行高调节不生效及进入课表时边缘闪亮的问题。\n· 缩小课表工具菜单，桌面小组件入口增加请求反馈及手动添加说明。\n· 校园卡余额与充值改为底部卡片面板，保留现有切卡和充值操作。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.1/MudLife-1.5.1.apk",
+  "versionCode": 43,
+  "versionName": "1.5.2",
+  "releaseDate": "2026-11-18",
+  "title": "江大生活 · Jiangda Life v1.5.2",
+  "changelog": "· 新增开场动画和账号引导，登录后即时显示对应状态。选择「稍后登录」后可在下次启动继续，引导默认最多出现两次，可在「我的 → 偏好设置」重新开启。\n· 洗浴按分区管理使用码和消费记录，支持查看当前分区的状态，以及首次设置或修改使用码。\n· 整理账号登录界面和「我的」页面，调整更新弹窗，启动时自动检查更新，有新版时在「检查更新」旁显示绿点。\n· 教务同步统一走学校 WebVPN 进入本科教务。已有有效会话时可直接继续，会话失效时按学校流程登录。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.2/MudLife-1.5.2.apk",
   "mirrors": [
-    "https://gitee.com/cainite/MudLife/releases/download/v1.5.1/MudLife-1.5.1.apk"
+    "https://gitee.com/cainite/MudLife/releases/download/v1.5.2/MudLife-1.5.2.apk"
   ]
 }

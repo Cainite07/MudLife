@@ -29,7 +29,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="uiMode|screenSize|screenLayout|orientation"
-            android:theme="@style/Theme.MudLife">
+            android:theme="@style/Theme.MudLife.Launch">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

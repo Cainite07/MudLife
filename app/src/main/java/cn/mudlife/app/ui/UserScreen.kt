@@ -30,11 +30,15 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import cn.mudlife.app.BuildConfig
 import cn.mudlife.app.ui.theme.*
 import cn.mudlife.app.utils.HapticHelper
 import cn.mudlife.app.utils.PrefsHelper
@@ -59,7 +63,10 @@ fun UserScreen(
     var buttonCenter by remember { mutableStateOf(Offset.Zero) }
 
     LaunchedEffect(codeKind) {
-        if (codeKind != "dryer") viewModel?.loadQzhqUseCode()
+        if (codeKind != "dryer") {
+            viewModel?.loadQzhqUseCode()
+            viewModel?.loadQzhqProjects()
+        }
         if (codeKind != "bath" && PrefsHelper.isLoggedIn) viewModel?.loadUseCode()
     }
 
@@ -69,6 +76,10 @@ fun UserScreen(
     var showRememberPrefixDialog by remember { mutableStateOf(false) }
     var showQzhqLoginDialog by remember { mutableStateOf(false) }
     var showLogViewerDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(viewModel?.isQzhqLoggedIn, viewModel?.qzhqProjectId) {
+        showChangeCodeDialog = false
+        showRememberPrefixDialog = false
+    }
 
     Column(
         modifier = Modifier
@@ -144,158 +155,86 @@ fun UserScreen(
         }
 
         }
-        if (codeKind != "dryer") {
-        // 4. 🚿 洗浴使用码（居上方，严格对标演示稿） 🚿
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = AppColors.Card),
-            border = BorderStroke(1.dp, AppColors.Border.copy(alpha = 0.65f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-                // 标题栏：极简无括号
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+        if (codeKind != "dryer" && viewModel != null) {
+            val hasCode = qzhqUseCode?.isSet == true
+            val loading = viewModel.qzhqLoading
+            val error = viewModel.qzhqCodeError
+            val loggedIn = viewModel.isQzhqLoggedIn
+            val fullCode = if (loggedIn && !loading && qzhqUseCode?.useCodeStatus == 1) {
+                cn.mudlife.app.model.BathCode.complete(qzhqUseCode.randomCode, viewModel.qzhqPrefix)
+            } else null
+            val needsPrefix = hasCode && viewModel.qzhqPrefix.isBlank() &&
+                qzhqUseCode?.randomCode?.matches(Regex("[0-9]{3}")) == true
+
+            Surface(color = AppColors.Card, shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, AppColors.Border.copy(alpha = 0.65f))) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Shower, null, tint = AppColors.Accent, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("洗浴使用码", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextSecondary)
-                    }
-
-                    if (viewModel?.isQzhqLoggedIn == true) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(
-                                onClick = {
-                                    HapticHelper.tick(context)
-                                    showChangeCodeDialog = true
-                                },
-                                contentPadding = PaddingValues(horizontal = 4.dp)
-                            ) {
-                                Text("修改", fontSize = 13.sp, color = AppColors.Accent, fontWeight = FontWeight.Medium)
-                            }
-                            Text(
-                                "|",
-                                fontSize = 12.sp,
-                                color = AppColors.TextSecondary.copy(alpha = 0.4f),
-                                modifier = Modifier.padding(horizontal = 2.dp)
-                            )
-                            TextButton(
-                                onClick = {
-                                    HapticHelper.tick(context)
-                                    showQzhqLoginDialog = true
-                                },
-                                contentPadding = PaddingValues(horizontal = 4.dp)
-                            ) {
-                                Text("重登", fontSize = 13.sp, color = AppColors.TextSecondary, fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    } else {
-                        TextButton(
-                            onClick = {
-                                HapticHelper.tick(context)
-                                showQzhqLoginDialog = true
-                            },
-                            contentPadding = PaddingValues(horizontal = 6.dp)
-                        ) {
-                            Text("登录后勤", fontSize = 13.sp, color = AppColors.Accent, fontWeight = FontWeight.Medium)
+                        Text("洗浴使用码", Modifier.weight(1f), fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        if (loggedIn) {
+                            BathProjectPicker(viewModel, viewModel.qzhqProjectId, enabled = !loading,
+                                onSelect = viewModel::selectQzhqProject)
                         }
                     }
-                }
 
-                Spacer(Modifier.height(4.dp))
-
-                val random3 = qzhqUseCode?.randomCode?.ifEmpty { null } ?: PrefsHelper.qzhqRandomCode.ifEmpty { null }
-                val custom5 = viewModel?.qzhqPrefix ?: PrefsHelper.qzhqCustomCode
-                val fullCode = if (viewModel?.isQzhqLoggedIn == true) cn.mudlife.app.model.BathCode.complete(random3, custom5) else null
-
-                // 8 位大字使用码（整行可点击复制 + 磁吸双击微震）
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .combinedClickable(onClick = {
-                            if (!fullCode.isNullOrEmpty()) {
-                                HapticHelper.doubleClick(context)
+                    if (fullCode != null) {
+                        Text(fullCode, Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                            .combinedClickable(onClick = {
                                 clipboardManager.setText(AnnotatedString(fullCode))
-                                viewModel?.toastMessage = "已复制洗浴使用码"
-                            } else if (viewModel?.isQzhqLoggedIn == true) {
-                                if (custom5.isEmpty()) showRememberPrefixDialog = true else viewModel.loadQzhqUseCode()
-                            }
-                        }, onLongClick = {
-                            if (viewModel?.isQzhqLoggedIn == true) showRememberPrefixDialog = true
-                        })
-                        .padding(vertical = 4.dp)
-                ) {
-                    if (!fullCode.isNullOrEmpty()) {
-                        Text(
-                            text = fullCode,
-                            fontSize = 34.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 2.sp,
-                            color = AppColors.TextPrimary
-                        )
-                    } else if (viewModel?.isQzhqLoggedIn == false) {
-                        Text(
-                            "未登录后勤专区",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AppColors.TextSecondary
-                        )
+                                HapticHelper.tick(context)
+                                viewModel.toastMessage = "已复制洗浴使用码"
+                            }, onLongClick = { showRememberPrefixDialog = true },
+                                onClickLabel = "复制使用码", onLongClickLabel = "记住前五位"),
+                            fontSize = 34.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                            letterSpacing = 2.sp, color = AppColors.TextPrimary)
                     } else {
                         Text(
-                            when { custom5.isEmpty() -> "点击记住已有前五位"; viewModel?.qzhqLoading == true -> "正在获取后三位…"; else -> "未获取到后三位，点击重试" },
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.TextSecondary
+                            when {
+                                !loggedIn -> if (viewModel.qzhqSessionExpired) "后勤登录已失效" else "请先登录趣智后勤热水"
+                                loading -> "正在同步使用码…"
+                                error != null -> error
+                                qzhqUseCode == null -> "等待同步使用码"
+                                !hasCode -> "该分区未设置使用码"
+                                qzhqUseCode.useCodeStatus != 1 -> "使用码已关闭"
+                                needsPrefix -> "已设置，需填写前五位以显示完整码"
+                                else -> "暂时无法显示完整使用码"
+                            }, color = AppColors.TextSecondary, fontSize = 14.sp
                         )
                     }
-                }
 
-                Spacer(Modifier.height(6.dp))
-                HorizontalDivider(color = AppColors.Border, thickness = 1.dp)
-                Spacer(Modifier.height(8.dp))
-
-                // 极简单行：左侧提示 + 右侧 M3 Switch 开关
-                val isShowerCodeOn = (qzhqUseCode?.useCodeStatus ?: PrefsHelper.qzhqStatus) == 1
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "点按复制 · 长按记住前五位",
-                        modifier = Modifier.weight(1f).padding(end = 12.dp),
-                        fontSize = 12.sp,
-                        color = AppColors.TextSecondary
-                    )
-                    Switch(
-                        checked = isShowerCodeOn,
-                        enabled = viewModel?.isQzhqLoggedIn == true && viewModel.qzhqLoading == false,
-                        onCheckedChange = { checked ->
-                            HapticHelper.click(context)
-                            if (viewModel?.isQzhqLoggedIn == true) {
-                                viewModel.toggleQzhqStatus(if (checked) 1 else 0)
-                            } else {
-                                viewModel?.toastMessage = "请先登录后勤专区"
+                    if (!loading || hasCode) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            when {
+                                !loggedIn -> TextButton(onClick = { showQzhqLoginDialog = true }) {
+                                    Text(if (viewModel.qzhqSessionExpired) "重新登录" else "登录后勤")
+                                }
+                                error != null || qzhqUseCode == null ->
+                                    TextButton(enabled = !loading, onClick = { viewModel.loadQzhqUseCode() }) { Text("重试") }
+                                !hasCode -> TextButton(onClick = { showChangeCodeDialog = true }) { Text("设置使用码") }
+                                else -> {
+                                    TextButton(enabled = !loading, onClick = { showChangeCodeDialog = true }) { Text("修改") }
+                                    if (needsPrefix) TextButton(enabled = !loading, onClick = {
+                                        showRememberPrefixDialog = true
+                                    }) { Text("记住前五位") }
+                                    Spacer(Modifier.weight(1f))
+                                    Switch(
+                                        checked = qzhqUseCode?.useCodeStatus == 1,
+                                        enabled = !loading,
+                                        onCheckedChange = { viewModel.toggleQzhqStatus(if (it) 1 else 0) },
+                                        modifier = Modifier.semantics { contentDescription = "启用洗浴使用码" },
+                                        colors = SwitchDefaults.colors(checkedTrackColor = AppColors.Accent)
+                                    )
+                                }
                             }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = AppColors.OnAccent,
-                            checkedTrackColor = AppColors.Accent,
-                            uncheckedThumbColor = AppColors.TextSecondary,
-                            uncheckedTrackColor = AppColors.Border
-                        )
-                    )
+                        }
+                    }
                 }
             }
         }
 
-        }
         if (codeKind != "bath") {
         // 5. 💨 吹风机使用码（居下方，与洗浴码严格镜像对称） 💨
         Card(
@@ -704,7 +643,7 @@ fun UserScreen(
         LogViewerDialog(onDismiss = { showLogViewerDialog = false })
     }
 
-    if (showRememberPrefixDialog) {
+    if (showRememberPrefixDialog && viewModel?.isQzhqLoggedIn == true) {
         var prefix by remember { mutableStateOf(viewModel?.qzhqPrefix.orEmpty()) }
         AlertDialog(
             onDismissRequest = { showRememberPrefixDialog = false },
@@ -730,47 +669,25 @@ fun UserScreen(
             dismissButton = { TextButton(onClick = { showRememberPrefixDialog = false }) { Text("取消") } }
         )
     }
-    if (showChangeCodeDialog) {
-        val phoneSuffix = (PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }).takeLast(3)
+    if (showChangeCodeDialog && viewModel != null && viewModel.isQzhqLoggedIn) {
+        val project = viewModel.qzhqProjects.firstOrNull { it.id.toString() == viewModel.qzhqProjectId }
         ChangeUseCodeDialog(
-            phoneSuffix = phoneSuffix,
+            firstSetup = qzhqUseCode?.isSet == false,
+            projectLabel = project?.label.orEmpty(),
+            busy = viewModel.qzhqLoading,
             onDismiss = { showChangeCodeDialog = false },
-            onSubmit = { new5Code ->
-                viewModel?.setQzhqUseCode(new5Code) { success, _ ->
-                    if (success) {
-                        showChangeCodeDialog = false
-                    }
-                }
-            }
+            onSubmit = viewModel::setQzhqUseCode
         )
     }
 
-    if (showQzhqLoginDialog) {
-        val defaultPhone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone }
-        QzhqLoginDialog(
-            initialPhone = defaultPhone,
+    if (showQzhqLoginDialog && viewModel != null) {
+        ServiceLoginDialog(
+            accountName = "趣智后勤热水",
+            initialPhone = PrefsHelper.qzhqPhone.ifEmpty { PrefsHelper.telephone },
             onDismiss = { showQzhqLoginDialog = false },
-            onPasswordSubmit = { loginPhone, password ->
-                viewModel?.loginQzhq(loginPhone, password) { success, _ ->
-                    if (success) {
-                        showQzhqLoginDialog = false
-                        viewModel.loadQzhqUseCode()
-                    }
-                }
-            },
-            onSmsSubmit = { loginPhone, smsCode ->
-                viewModel?.smsLoginQzhq(loginPhone, smsCode) { success, _ ->
-                    if (success) {
-                        showQzhqLoginDialog = false
-                        viewModel.loadQzhqUseCode()
-                    }
-                }
-            },
-            onSendSms = { phoneToSend, onSent ->
-                viewModel?.sendQzhqSmsCode(phoneToSend) { success, _ ->
-                    onSent(success)
-                }
-            }
+            onPasswordSubmit = viewModel::loginQzhq,
+            onSmsSubmit = viewModel::smsLoginQzhq,
+            onSendSms = viewModel::sendQzhqSmsCode
         )
     }
 
@@ -778,95 +695,77 @@ fun UserScreen(
 
 @Composable
 internal fun AppUpdateDialog(viewModel: MainViewModel) {
+    if (!viewModel.showUpdateDialog) return
+    val info = viewModel.updateInfo ?: return
     val context = LocalContext.current
-    if (viewModel.showUpdateDialog == true) {
-        val info = viewModel.updateInfo
-        val isDownloading = viewModel.isDownloadingUpdate
-        val download = viewModel.updateDownload
-        val progress = download.fraction
+    val downloading = viewModel.isDownloadingUpdate
+    val download = viewModel.updateDownload
+    val progress = download.fraction?.takeIf { download.phase == cn.mudlife.app.utils.UpdateDownloadPhase.DOWNLOADING }
+    val error = viewModel.updateError
+    val notes = remember(info.changelog) { info.changelog.lines().map(String::trim).filter(String::isNotBlank) }
 
-        AlertDialog(
-            onDismissRequest = { viewModel.closeUpdateDialog() },
-            title = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("发现新版本", fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                    info?.versionName?.let { ver ->
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppColors.Accent.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, AppColors.Accent.copy(alpha = 0.25f))
-                        ) {
-                            Text(
-                                text = "v$ver",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = AppColors.Accent,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
+    Dialog(onDismissRequest = viewModel::closeUpdateDialog) {
+        Surface(
+            modifier = Modifier.widthIn(max = 370.dp).fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            color = AppColors.SolidSurface,
+            contentColor = AppColors.TextPrimary,
+            border = BorderStroke(1.dp, AppColors.Border)
+        ) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Outlined.SystemUpdate, null, Modifier.size(18.dp), tint = AppColors.Accent)
+                    Text("应用更新",
+                        color = AppColors.Accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Text(info.versionName, Modifier.padding(top = 6.dp, bottom = 14.dp),
+                    fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                if (notes.isNotEmpty()) {
+                    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = AppColors.Background) {
+                        Column(Modifier.heightIn(max = 235.dp).verticalScroll(rememberScrollState()).padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("更新内容", color = AppColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            notes.forEach { line ->
+                                val bullet = line.first() in listOf('·', '•', '-', '*')
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (bullet) Box(Modifier.padding(top = 9.dp).size(4.dp)
+                                        .background(AppColors.Accent, CircleShape))
+                                    Text(if (bullet) line.drop(1).trimStart() else line, fontSize = 14.sp,
+                                        lineHeight = 21.sp, color = AppColors.TextPrimary)
+                                }
+                            }
                         }
                     }
                 }
-            },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
-                    if (!info?.changelog.isNullOrBlank()) {
-                        Text(
-                            text = info?.changelog ?: "",
-                            fontSize = 15.sp,
-                            color = AppColors.TextPrimary,
-                            lineHeight = 19.sp
-                        )
+                error?.let { Text(it, Modifier.padding(top = 12.dp), color = AppColors.Danger, fontSize = 13.sp) }
+                if (downloading) {
+                    Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 7.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(download.description, color = AppColors.TextSecondary, fontSize = 13.sp)
+                        progress?.let { Text("${(it * 100).toInt()}%", color = AppColors.Accent, fontSize = 13.sp) }
                     }
-                    viewModel.updateError?.let { error ->
-                        Text(error, color = AppColors.Danger, fontSize = 13.sp, modifier = Modifier.padding(top = 14.dp))
-                    }
-                    if (isDownloading) {
-                        Spacer(Modifier.height(14.dp))
-                        val track = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
-                        if (progress != null && download.phase == cn.mudlife.app.utils.UpdateDownloadPhase.DOWNLOADING)
-                            LinearProgressIndicator(progress = { progress }, modifier = track,
-                                color = AppColors.Accent, trackColor = AppColors.Border)
-                        else LinearProgressIndicator(modifier = track, color = AppColors.Accent, trackColor = AppColors.Border)
-                        Spacer(Modifier.height(8.dp))
-                        if (progress != null && download.phase == cn.mudlife.app.utils.UpdateDownloadPhase.DOWNLOADING)
-                            Text("${(progress * 100).toInt()}%", fontSize = 13.sp, color = AppColors.TextSecondary,
-                                modifier = Modifier.align(Alignment.CenterHorizontally))
-                        Text(download.description, fontSize = 12.sp, color = AppColors.TextSecondary,
-                            modifier = Modifier.align(Alignment.CenterHorizontally))
+                    val track = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp))
+                    if (progress != null) LinearProgressIndicator(progress = { progress }, modifier = track,
+                        color = AppColors.Accent, trackColor = AppColors.Border)
+                    else LinearProgressIndicator(modifier = track, color = AppColors.Accent, trackColor = AppColors.Border)
+                } else {
+                    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = viewModel::closeUpdateDialog, modifier = Modifier.weight(1f)) {
+                            Text(if (BuildConfig.DEBUG) "关闭" else "稍后", color = AppColors.TextSecondary)
+                        }
+                        if (!BuildConfig.DEBUG) Button(
+                            onClick = {
+                                HapticHelper.click(context)
+                                viewModel.startDownloadUpdate(context)
+                            },
+                            modifier = Modifier.weight(1.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Accent, contentColor = AppColors.OnAccent)
+                        ) { Text(if (error == null) "下载更新" else "重试下载", fontWeight = FontWeight.SemiBold) }
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        HapticHelper.click(context)
-                        viewModel.startDownloadUpdate(context)
-                    },
-                    enabled = !isDownloading,
-                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Accent),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text(
-                        if (isDownloading) "下载中..." else if (viewModel.updateError != null) "重试更新" else "立即更新",
-                        color = AppColors.OnAccent,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                if (!isDownloading) {
-                    TextButton(onClick = { viewModel.closeUpdateDialog() }) {
-                        Text("稍后", color = AppColors.TextSecondary)
-                    }
-                }
-            },
-            shape = RoundedCornerShape(22.dp),
-            containerColor = AppColors.SolidSurface
-        )
+            }
+        }
     }
 }
 

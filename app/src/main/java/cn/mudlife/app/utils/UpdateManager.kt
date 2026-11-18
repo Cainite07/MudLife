@@ -79,9 +79,6 @@ object UpdateManager {
     }
 
     suspend fun checkUpdate(): Result<UpdateInfo> = withContext(Dispatchers.IO) {
-        if (cn.mudlife.app.BuildConfig.DEBUG) {
-            return@withContext Result.failure(IllegalStateException("修复预览版请使用单独提供的测试包更新"))
-        }
         val info = collectManifests(CHECK_URLS, BuildConfig.VERSION_CODE, fetch = ::fetchManifest)
         if (info != null) Result.success(info)
         else Result.failure(Exception("检测更新失败，请稍后重试"))
