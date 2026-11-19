@@ -81,11 +81,20 @@ class SessionPolicyTest {
         listOf("0", "-1", "1e2", "NaN", "1.001").forEach { assertNull(ElectricPolicy.cost(it, "0.54")) }
         assertNull(ElectricPolicy.cost("10", "0"))
     }
-    @Test fun onlyMainCampusDormsCanBeUsed() {
+    @Test fun electricityAcceptsSchoolCampusIdsWithAnExactSelectionHierarchy() {
         val d = Dorm(ElectricOption("校本部", "校本部"), ElectricOption("region-id", "区域"), ElectricOption("block-id", "楼栋"), ElectricOption("room-id", "房间"))
         assertEquals("room-id", d.fields()["room"])
         assertTrue(ElectricPolicy.valid(d))
-        assertFalse(ElectricPolicy.valid(d.copy(campus = ElectricOption("京江", "京江"))))
+        for (name in listOf("北固校区", "综合楼宿舍")) {
+            val other = d.copy(campus = ElectricOption("server-campus-id", name))
+            assertTrue(ElectricPolicy.valid(other))
+            assertEquals("server-campus-id", other.fields()["campus"])
+        }
+        assertTrue(ElectricPolicy.validSelection(0, emptyMap()))
+        assertTrue(ElectricPolicy.validSelection(1, mapOf("campus" to "server-campus-id")))
+        assertFalse(ElectricPolicy.validSelection(2, mapOf("campus" to "server-campus-id", "floor" to "wrong-level")))
+        assertFalse(ElectricPolicy.validSelection(1, d.fields()))
+        assertFalse(ElectricPolicy.valid(d.copy(campus = ElectricOption("", "北固校区"))))
         assertFalse(ElectricPolicy.valid(d.copy(room = ElectricOption("", "房间"))))
     }
     @Test fun positiveServerAmountsDoNotTurnConsumptionIntoIncome() {

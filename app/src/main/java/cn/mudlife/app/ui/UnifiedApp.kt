@@ -246,7 +246,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
         }
     }) { insets ->
         Box(Modifier.fillMaxSize()) {
-            val frame = if (edgeRoot) Modifier else Modifier.padding(insets).consumeWindowInsets(insets)
+            val frame = if (edgeRoot || page == "setup") Modifier else Modifier.padding(insets).consumeWindowInsets(insets)
             RouteMotion(tab, page, frame) {
             pageState.SaveableStateProvider(page.ifEmpty { "tab:$tab" }) {
             when {
@@ -254,7 +254,8 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
                     if (guidePresentation > 0) AccountGuide(
                         school = campus.hasSession, campus = loggedIn, logistics = life.isQzhqLoggedIn,
                         schoolExpired = campus.needsLogin, logisticsExpired = life.qzhqSessionExpired,
-                        presentation = guidePresentation, onSelect = selectAccount, onFinish = finishSetup
+                        presentation = guidePresentation, contentInsets = insets,
+                        onSelect = selectAccount, onFinish = finishSetup
                     )
                 }
                 page in setOf("codes", "bath", "dryer") -> Column {

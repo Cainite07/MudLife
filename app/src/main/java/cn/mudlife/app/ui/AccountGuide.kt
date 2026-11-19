@@ -37,7 +37,7 @@ import cn.mudlife.app.ui.theme.AppColors
 @Composable
 internal fun AccountGuide(
     school: Boolean, campus: Boolean, logistics: Boolean,
-    schoolExpired: Boolean, logisticsExpired: Boolean, presentation: Int,
+    schoolExpired: Boolean, logisticsExpired: Boolean, presentation: Int, contentInsets: PaddingValues,
     onSelect: (String) -> Unit, onFinish: (Boolean) -> Unit
 ) {
     val clock = remember(presentation) { Animatable(0f) }
@@ -54,19 +54,23 @@ internal fun AccountGuide(
     val ink = AppColors.Accent
     val completed = school && !schoolExpired && campus && logistics && !logisticsExpired
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val top = (maxHeight * .15f).coerceIn(20.dp, 145.dp)
-        val sectionGap = (maxHeight * .065f).coerceIn(22.dp, 60.dp)
-        val travel = (maxHeight * .45f - top - iconSize / 2).coerceIn(0.dp, 190.dp)
+        val safeTop = contentInsets.calculateTopPadding()
+        val safeHeight = (maxHeight - safeTop - contentInsets.calculateBottomPadding()).coerceAtLeast(0.dp)
+        val top = (safeHeight * .15f).coerceIn(20.dp, 145.dp)
+        val sectionGap = (safeHeight * .065f).coerceIn(22.dp, 60.dp)
+        val travel = (safeHeight * .45f - top - iconSize / 2).coerceIn(0.dp, 190.dp)
         Canvas(Modifier.fillMaxSize()) {
             val t = clock.value
             val settle = phase(t, .22f, .77f)
             val spread = phase(t, .08f, .92f)
-            val center = Offset(size.width / 2, (top + iconSize / 2 + travel * (1f - settle)).toPx())
+            val center = Offset(size.width / 2, (safeTop + top + iconSize / 2 + travel * (1f - settle)).toPx())
+            drawRect(ink, alpha = .035f * phase(t, .02f, .82f))
             val radius = (125.dp.toPx() + size.width * .57f * spread)
             drawCircle(Brush.radialGradient(listOf(ink, ink.copy(alpha = 0f)), center, radius),
                 radius, center, alpha = phase(t, 0f, .30f) * (.18f - .10f * spread))
         }
-        Column(Modifier.align(Alignment.TopCenter).widthIn(max = 480.dp).fillMaxSize()
+        Column(Modifier.align(Alignment.TopCenter).padding(contentInsets).consumeWindowInsets(contentInsets)
+            .widthIn(max = 480.dp).fillMaxSize()
             .padding(horizontal = 30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally) {

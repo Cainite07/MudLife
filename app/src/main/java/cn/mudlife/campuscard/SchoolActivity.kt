@@ -448,8 +448,11 @@ class SchoolActivity : ComponentActivity() {
             if(${quote(savedOrder)}){const root=document.querySelector('#app')?.__vue__;if(!root?.${'$'}router)return {state:'wait'};if(!window.__mudResume){window.__mudResume=true;sessionStorage.setItem('orderid',${quote(savedOrder)});root.${'$'}router.replace({name:'confirmPay'})}return {state:'wait'}}
             if(${creationStarted}){const id=sessionStorage.getItem('orderid')||'';return {state:'wait',id}}
             if(!p||String(p.feeitem?.feeitemid)!=='408'||!p.isEleric?.default||p.isBtnLoading)return {state:'wait'};
-            if(!window.__mudPrepare){window.__mudPrepare='waiting';const fields=$fields;const opts=${options.joinToString(prefix = "[", postfix = "]")};
-              if(fields.campus!=='校本部')return {state:'mismatch'};
+            if(!window.__mudPrepare){const fields=$fields;const opts=${options.joinToString(prefix = "[", postfix = "]")};
+              const campuses=p.aboutEleric?.data1;
+              if(!Array.isArray(campuses)||!campuses.length)return {state:'wait'};
+              if(!campuses.some(o=>String(o.value)===fields.campus&&String(o.name).trim()===opts[0]?.name))return {state:'mismatch'};
+              window.__mudPrepare='waiting';
               p.batteryParams={...fields};p.aboutEleric.total=['campus','building','floor','room'].map((code,i)=>({code,level:i+1,name:['校区','区域','楼栋','房间'][i]}));
               opts.forEach((o,i)=>p.${'$'}set(p.aboutEleric,'data'+(i+1),[o]));
               p.getBatteryData(fields).then(()=>{if(p.notPay||!p.third_party||!p.aboutEleric.electricInfo){window.__mudPrepare='blocked';return}p.getEnterCount(${quote(quantity)});window.__mudPrepare='ready'}).catch(()=>window.__mudPrepare='blocked');return {state:'wait'}}

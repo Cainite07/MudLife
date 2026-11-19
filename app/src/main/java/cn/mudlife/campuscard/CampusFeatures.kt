@@ -128,7 +128,7 @@ private suspend fun SchoolApi.schoolImage(raw: String): Bitmap? = withContext(Di
 
 data class ElectricOption(val id: String, val name: String)
 data class Dorm(val campus: ElectricOption, val region: ElectricOption, val building: ElectricOption, val room: ElectricOption) {
-    val title get() = listOf(region.name, building.name, room.name).joinToString(" · ")
+    val title get() = listOf(campus.name, region.name, building.name, room.name).joinToString(" · ")
     fun fields() = mapOf("campus" to campus.id, "building" to region.id, "floor" to building.id, "room" to room.id)
     fun toJson() = JSONObject().apply { put("feeitem", "408"); listOf(campus, region, building, room).forEachIndexed { i, o -> put(ElectricPolicy.keys[i], JSONObject().put("id", o.id).put("name", o.name)) } }
     companion object {
@@ -141,7 +141,10 @@ data class Dorm(val campus: ElectricOption, val region: ElectricOption, val buil
 }
 object ElectricPolicy {
     val keys = listOf("campus", "building", "floor", "room")
-    fun valid(d: Dorm) = d.campus.id == "校本部" && d.fields().values.all { it.isNotBlank() && it.length <= 200 }
+    fun valid(d: Dorm) = validSelection(keys.size, d.fields())
+    fun validSelection(level: Int, fields: Map<String, String>) =
+        level in 0..keys.size && fields.keys == keys.take(level).toSet() &&
+            fields.values.all { it.isNotBlank() && it.length <= 200 }
     fun cost(quantity: String, price: String): Long? = runCatching {
         if (!quantity.matches(Regex("[0-9]{1,5}(\\.[0-9]{1,2})?"))) return null
         val q = BigDecimal(quantity); val p = BigDecimal(price)
@@ -157,8 +160,9 @@ suspend fun SchoolApi.electricRules(): ElectricRules {
         Money.parseYuan(fee.clean("maxmoney")) ?: throw SchoolFailure("学校未提供电费限额"),
         Html.fromHtml(fee.clean("remark"), Html.FROM_HTML_MODE_LEGACY).toString().trim())
 }
-suspend fun SchoolApi.electricOptions(level: Int, fields: Map<String, String>, query: Boolean = false): ElectricResult {
-    require(level in 0..4 && fields["campus"] == "校本部")
+suspend fun SchoolApi.electricOptions(level: Int, fields: Map<String, String>): ElectricResult {
+    require(ElectricPolicy.validSelection(level, fields))
+    val query = level == ElectricPolicy.keys.size
     val data = get("/charge/feeitem/getThirdData", fields + mapOf("feeitemid" to "408", "type" to if (query) "IEC" else "select", "level" to "$level"), form = true).getJSONObject("map")
     val info = data.optJSONObject("showData")
     return ElectricResult(data.optJSONArray("data").objects().map { ElectricOption(it.clean("value"), it.clean("name")) }.filter { it.id.isNotBlank() },

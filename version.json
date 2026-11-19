@@ -1,11 +1,11 @@
 {
-  "versionCode": 43,
-  "versionName": "1.5.2",
-  "releaseDate": "2026-11-18",
-  "title": "江大生活 · Jiangda Life v1.5.2",
-  "changelog": "· 新增开场动画和账号引导，登录后即时显示对应状态。选择「稍后登录」后可在下次启动继续，引导默认最多出现两次，可在「我的 → 偏好设置」重新开启。\n· 洗浴按分区管理使用码和消费记录，支持查看当前分区的状态，以及首次设置或修改使用码。\n· 整理账号登录界面和「我的」页面，调整更新弹窗，启动时自动检查更新，有新版时在「检查更新」旁显示绿点。\n· 教务同步统一走学校 WebVPN 进入本科教务。已有有效会话时可直接继续，会话失效时按学校流程登录。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.2/MudLife-1.5.2.apk",
+  "versionCode": 44,
+  "versionName": "1.5.3",
+  "releaseDate": "2026-11-19",
+  "title": "江大生活 · Jiangda Life v1.5.3",
+  "changelog": "· 宿舍电费新增校区选择，从江苏大学一卡通加载北固校区、校本部和综合楼宿舍。切换校区后重新选择对应的区域、楼栋和房间。\n· 修复开场引导顶部的背景断层，状态栏背后与页面背景同步渐变。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.3/MudLife-1.5.3.apk",
   "mirrors": [
-    "https://gitee.com/cainite/MudLife/releases/download/v1.5.2/MudLife-1.5.2.apk"
+    "https://gitee.com/cainite/MudLife/releases/download/v1.5.3/MudLife-1.5.3.apk"
   ]
 }

@@ -249,6 +249,7 @@ import java.time.YearMonth
     var quantity by rememberSaveable { mutableStateOf("") }
     var confirming by remember { mutableStateOf(false) }
     var accepted by remember { mutableStateOf(false) }
+    val levels = listOf("校区", "区域", "楼栋", "房间")
     val result = vm.electricResult; val rules = vm.electricRules; val dorm = vm.dorm
     val price = result?.price ?: rules?.price.orEmpty()
     val fen = ElectricPolicy.cost(quantity, price)
@@ -260,18 +261,18 @@ import java.time.YearMonth
                 Text("常用宿舍", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 vm.favorites.forEach { favorite ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { vm.useDorm(favorite) }, enabled = !vm.electricBusy, modifier = Modifier.weight(1f)) { Text(favorite.title, maxLines = 2) }
+                        TextButton(onClick = { quantity = ""; vm.useDorm(favorite) }, enabled = !vm.electricBusy && vm.electricOptions[0].isNotEmpty(), modifier = Modifier.weight(1f)) { Text(favorite.title, maxLines = 2) }
                         IconButton(onClick = { vm.removeDorm(favorite) }) { Icon(Icons.Outlined.Close, "移除常用宿舍", Modifier.size(18.dp)) }
                     }
                 }
             }
             Paper {
-                listOf("区域", "楼栋", "房间").forEachIndexed { i, title ->
+                levels.forEachIndexed { i, title ->
                     Row(Modifier.fillMaxWidth().clickable(enabled = !vm.electricBusy && vm.electricOptions[i].isNotEmpty()) { picker = i }.padding(vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(title, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(52.dp))
                         Text(vm.electricSelected[i]?.name ?: "请选择", fontSize = 16.sp, modifier = Modifier.weight(1f).padding(end = 8.dp)); Icon(Icons.Outlined.ExpandMore, null, Modifier.size(19.dp))
                     }
-                    if (i < 2) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    if (i < levels.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
             vm.electricError?.let { Text(it, fontSize = 14.sp); TextButton(onClick = vm::refreshElectric) { Text("重试") } }
@@ -292,7 +293,7 @@ import java.time.YearMonth
             Spacer(Modifier.height(16.dp))
         }
     }
-    if (picker >= 0) OptionPicker(listOf("选择区域", "选择楼栋", "选择房间")[picker], vm.electricOptions[picker], { picker = -1 }) { vm.chooseElectric(picker, it); picker = -1; quantity = "" }
+    if (picker >= 0) OptionPicker("选择${levels[picker]}", vm.electricOptions[picker], { picker = -1 }) { vm.chooseElectric(picker, it); picker = -1; quantity = "" }
     if (confirming && dorm != null && fen != null && rules != null) AlertDialog(onDismissRequest = { confirming = false }, title = { Text("确认电费充值") }, text = {
         Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(15.dp)) {
             Text(dorm.title, fontSize = 15.sp); Text("$quantity 度 · ¥ ${Money.yuan(fen)}", fontSize = 23.sp)

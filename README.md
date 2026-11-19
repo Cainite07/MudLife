@@ -4,7 +4,7 @@
 
 <h1 align="center">江大生活 · Jiangda Life</h1>
 <p align="center"><b>校园日常，放在一起。</b><br>江苏大学一卡通 · 本科教务课表 · 趣智校园 · 趣智后勤热水</p>
-<p align="center">v1.5.2 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
+<p align="center">v1.5.3 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
 
 <p align="center">
   <a href="https://gitee.com/cainite/MudLife/releases"><b>Gitee 国内下载</b></a> &emsp;
@@ -25,7 +25,7 @@
   <tr>
     <td width="50%" valign="top">
       <h3>首页 · 随手使用</h3>
-      <p>点校园卡余额直接出示付款码。<br>下方可扫码出水、查宿舍电费、查看使用码。</p>
+      <p>点校园卡余额直接出示付款码。<br>下方可扫码出水、按校区查缴宿舍电费、查看使用码。</p>
     </td>
     <td width="50%" valign="top">
       <h3>课表 · 查看本周</h3>
@@ -85,7 +85,7 @@ Kotlin 2.0.21 · Compose / Material 3 · Retrofit / OkHttp · MQTT · CameraX / 
 ./gradlew assembleRelease
 ```
 
-正式版仅打包 **ARM64（arm64-v8a）**，文件名为 `MudLife-1.5.2.apk`，内置离线扫码模型。
+正式版仅打包 **ARM64（arm64-v8a）**，文件名为 `MudLife-1.5.3.apk`，内置离线扫码模型。
 
 正式构建需要维护者已有的固定签名，私钥与凭据不在仓库中。详见 [签名说明](signing/README.md) · [双平台发布](docs/RELEASING.md) · [宣传图制作](assets/promo/prompts.md)。
 

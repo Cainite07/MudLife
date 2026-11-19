@@ -7,7 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
@@ -56,12 +58,16 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
     var electricBusy by mutableStateOf(false); private set
     var electricError by mutableStateOf<String?>(null); private set
     var electricRules by mutableStateOf<ElectricRules?>(null); private set
-    var electricOptions by mutableStateOf(List(3) { emptyList<ElectricOption>() }); private set
-    var electricSelected by mutableStateOf(List<ElectricOption?>(3) { null }); private set
+    var electricOptions by mutableStateOf(List(ElectricPolicy.keys.size) { emptyList<ElectricOption>() }); private set
+    var electricSelected by mutableStateOf(List<ElectricOption?>(ElectricPolicy.keys.size) { null }); private set
     var electricResult by mutableStateOf<ElectricResult?>(null); private set
     var favorites by mutableStateOf(readFavorites()); private set
     private var electricLoaded = false
-    val dorm: Dorm? get() = electricSelected.let { s -> if (s.any { it == null }) null else Dorm(ElectricOption("校本部", "校本部"), s[0]!!, s[1]!!, s[2]!!) }
+    private var electricJob: Job? = null
+    val dorm: Dorm? get() {
+        val (campus, region, building, room) = electricSelected
+        return Dorm(campus ?: return null, region ?: return null, building ?: return null, room ?: return null)
+    }
     var hasSession by mutableStateOf(session.hasSession); private set
     var needsLogin by mutableStateOf(false); private set
     var busy by mutableStateOf(false); private set
@@ -101,7 +107,7 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
                 val account = card?.account.orEmpty()
                 if (!session.selectAccount(requestToken, account, card)) return@launch
                 config = freshConfig; cards = freshCards; selected = account
-                if (previousAccount != selected) { resetBills(); billMonth = BillPeriodPolicy.restore(session.billPeriod) }
+                if (previousAccount != selected) { resetBills(); billMonth = BillPeriodPolicy.restore(session.billPeriod); resetElectric() }
                 favorites = readFavorites()
                 hasSession = true; needsLogin = false; error = null; updatedAt = System.currentTimeMillis()
             } catch (_: LoginExpired) {
@@ -117,7 +123,7 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.coroutineContext.cancelChildren()
             resetBills(); hideCode(); identity = null; identityError = null; identityBusy = false
             cards = emptyList(); config = null; methods = emptyList(); rules = null; rulesBusy = false
-            electricLoaded = false; electricBusy = false; electricSelected = List(3) { null }; electricResult = null
+            resetElectric()
             busy = false; authenticatedToken = session.token
         }
         hasSession = session.hasSession; needsLogin = false; refresh()
@@ -125,7 +131,7 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
     fun selectCard(account: String) {
         if (!session.selectAccount(authenticatedToken, account, cards.find { it.account == account })) return
         selected = account; hideCode(); methods = emptyList(); identity = null
-        resetBills(); billMonth = BillPeriodPolicy.restore(session.billPeriod); favorites = readFavorites(); electricLoaded = false; electricSelected = List(3) { null }; electricResult = null
+        resetBills(); billMonth = BillPeriodPolicy.restore(session.billPeriod); favorites = readFavorites(); resetElectric()
     }
     fun selectMethod(id: String) { selectedMethod = id; generateCode() }
     fun codeVisibility(visible: Boolean) {
@@ -306,63 +312,102 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
     fun rememberDorm() { val d = dorm ?: return; favorites = (listOf(d) + favorites.filter { it.fields() != d.fields() }).take(8); saveFavorites() }
     fun removeDorm(d: Dorm) { favorites = favorites.filter { it.fields() != d.fields() }; saveFavorites() }
     fun loadElectric() {
-        if (electricBusy || electricLoaded) return
-        electricBusy = true; electricError = null
-        viewModelScope.launch {
-            try {
-                electricRules = api.electricRules()
-                electricOptions = listOf(api.electricOptions(1, mapOf("campus" to "校本部")).options, emptyList(), emptyList())
-                electricLoaded = true
-                favorites.firstOrNull()?.let { selectSavedDorm(it) }
-            } catch (e: Exception) { electricError = featureFailure(e, "电费服务暂时无法加载") }
-            finally { electricBusy = false }
+        if (electricLoaded) return
+        queryElectric("电费服务暂时无法加载") {
+            electricRules = api.electricRules()
+            val campuses = api.electricOptions(0, emptyMap()).options
+            if (campuses.isEmpty()) throw SchoolFailure("学校暂未返回可选校区")
+            electricOptions = listOf(campuses, emptyList(), emptyList(), emptyList())
+            electricSelected = List(ElectricPolicy.keys.size) { null }
+            electricResult = null
+            electricLoaded = true
+            val favorite = favorites.firstOrNull()
+            if (favorite != null) {
+                selectSavedDorm(favorite)
+            } else {
+                campuses.firstOrNull { it.name == "校本部" }?.let { selectElectric(0, it) }
+            }
         }
     }
     private suspend fun selectSavedDorm(d: Dorm) {
         require(ElectricPolicy.valid(d))
-        // Revalidate every saved choice against the current school hierarchy.
-        val regions = electricOptions[0]
-        if (regions.none { it.id == d.region.id }) throw SchoolFailure("常用宿舍区域已变更，请重新选择")
-        val buildings = api.electricOptions(2, mapOf("campus" to "校本部", "building" to d.region.id)).options
-        if (buildings.none { it.id == d.building.id }) throw SchoolFailure("常用宿舍楼栋已变更，请重新选择")
-        val rooms = api.electricOptions(3, mapOf("campus" to "校本部", "building" to d.region.id, "floor" to d.building.id)).options
-        if (rooms.none { it.id == d.room.id }) throw SchoolFailure("常用宿舍房间已变更，请重新选择")
-        electricOptions = listOf(regions, buildings, rooms)
-        electricSelected = listOf(regions.first { it.id == d.region.id }, buildings.first { it.id == d.building.id }, rooms.first { it.id == d.room.id })
-        electricResult = api.electricOptions(4, d.fields(), true)
+        val savedFields = d.fields()
+        val names = listOf("校区", "区域", "楼栋", "房间")
+        val options = mutableListOf(electricOptions[0])
+        val selected = mutableListOf<ElectricOption>()
+        val fields = linkedMapOf<String, String>()
+        // Revalidate saved choices against the same campus and hierarchy that supplied them.
+        for ((index, key) in ElectricPolicy.keys.withIndex()) {
+            if (index > 0) options.add(api.electricOptions(index, fields).options)
+            val option = options[index].firstOrNull { it.id == savedFields[key] }
+                ?: throw SchoolFailure("常用宿舍的${names[index]}已变更，请重新选择")
+            selected.add(option)
+            fields[key] = option.id
+        }
+        val result = api.electricOptions(ElectricPolicy.keys.size, fields)
+        electricOptions = options
+        electricSelected = selected
+        electricResult = result
     }
     fun useDorm(d: Dorm) {
-        if (electricBusy) return
-        electricBusy = true; electricError = null; electricResult = null; electricSelected = List(3) { null }
-        viewModelScope.launch { try { selectSavedDorm(d) } catch (e: Exception) { electricError = featureFailure(e, "宿舍暂时无法查询") } finally { electricBusy = false } }
-    }
-    fun chooseElectric(index: Int, option: ElectricOption) {
-        if (electricBusy || index !in 0..2 || electricOptions[index].none { it.id == option.id }) return
-        electricSelected = electricSelected.mapIndexed { i, old -> if (i < index) old else if (i == index) option else null }
-        electricOptions = electricOptions.mapIndexed { i, list -> if (i > index) emptyList() else list }
-        electricResult = null; electricBusy = true; electricError = null
-        viewModelScope.launch {
-            try {
-                val fields = mutableMapOf("campus" to "校本部")
-                electricSelected.forEachIndexed { i, o -> if (o != null) fields[ElectricPolicy.keys[i + 1]] = o.id }
-                val result = api.electricOptions(index + 2, fields, index == 2)
-                if (index == 2) electricResult = result else electricOptions = electricOptions.mapIndexed { i, old -> if (i == index + 1) result.options else old }
-            } catch (e: Exception) { electricError = featureFailure(e, "宿舍暂时无法查询") }
-            finally { electricBusy = false }
+        if (electricOptions[0].isEmpty()) return
+        queryElectric("宿舍暂时无法查询") {
+            electricResult = null
+            selectSavedDorm(d)
         }
     }
-    fun refreshElectric() { dorm?.let(::useDorm) ?: run { electricLoaded = false; loadElectric() } }
+    fun chooseElectric(index: Int, option: ElectricOption) {
+        if (index !in electricOptions.indices || option !in electricOptions[index]) return
+        queryElectric("宿舍暂时无法查询") { selectElectric(index, option) }
+    }
+    private fun queryElectric(fallback: String, query: suspend () -> Unit) {
+        if (electricBusy) return
+        electricBusy = true
+        electricError = null
+        electricJob = viewModelScope.launch {
+            try { query() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { electricError = featureFailure(e, fallback) }
+            finally { if (isActive) electricBusy = false }
+        }
+    }
+    private suspend fun selectElectric(index: Int, option: ElectricOption) {
+        electricSelected = electricSelected.take(index) + option + List(ElectricPolicy.keys.lastIndex - index) { null }
+        electricOptions = electricOptions.mapIndexed { i, choices -> if (i > index) emptyList() else choices }
+        electricResult = null
+        val level = index + 1
+        val fields = ElectricPolicy.keys.take(level).zip(electricSelected.take(level).map { requireNotNull(it).id }).toMap()
+        val result = api.electricOptions(level, fields)
+        if (level == ElectricPolicy.keys.size) electricResult = result
+        else electricOptions = electricOptions.mapIndexed { i, choices -> if (i == level) result.options else choices }
+    }
+    fun refreshElectric() {
+        if (electricBusy) return
+        val index = electricSelected.indexOfLast { it != null }
+        if (index >= 0) chooseElectric(index, requireNotNull(electricSelected[index]))
+        else { electricLoaded = false; loadElectric() }
+    }
+    private fun resetElectric() {
+        electricJob?.cancel()
+        electricLoaded = false
+        electricBusy = false
+        electricError = null
+        electricRules = null
+        electricOptions = List(ElectricPolicy.keys.size) { emptyList() }
+        electricSelected = List(ElectricPolicy.keys.size) { null }
+        electricResult = null
+    }
     private fun featureFailure(e: Exception, fallback: String): String {
         if (e is LoginExpired) { needsLogin = true; return "请更新学校登录" }
         return if (e is SchoolFailure) e.message ?: fallback else fallback
     }
     fun logout() {
         viewModelScope.coroutineContext.cancelChildren()
-        busy = false; identityBusy = false; rulesBusy = false; electricBusy = false; authenticatedToken = ""
+        busy = false; identityBusy = false; rulesBusy = false; authenticatedToken = ""
         paymentJob?.cancel(); paymentNotice = null; paymentChecking = false
         resetBills()
         viewModelScope.launch { billArchive.clear() }
-        identity = null; favorites = emptyList(); electricSelected = List(3) { null }; electricOptions = List(3) { emptyList() }; electricResult = null; electricLoaded = false; electricRules = null
+        identity = null; favorites = emptyList(); resetElectric()
         hideCode(); session.clear(); hasSession = false; needsLogin = false; cards = emptyList(); methods = emptyList()
         config = null; rules = null; updatedAt = 0; error = null
     }
