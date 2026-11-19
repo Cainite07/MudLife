@@ -1,4 +1,4 @@
-(function (checkHome, checkMissing, httpNotFound) {
+(function (checkHome, checkMissing, httpStatus) {
     const body = document.body;
     if (!body || document.readyState === "loading") return false;
     const visible = el => el.getClientRects().length > 0 &&
@@ -8,9 +8,9 @@
     const text = body.innerText.trim();
     if (checkHome && text.includes("功能菜单") && text.includes("我的应用")) return true;
     if (!checkMissing) return false;
-    const missing = value => value.length <= 400 && /\b404\b/.test(value) &&
+    const missing = value => value.length <= 400 && (httpStatus === 500 || /\b404\b/.test(value)) &&
         value.replace(/\s/g, "").includes("您访问的页面不存在");
-    if (httpNotFound || missing(text)) return true;
+    if (httpStatus === 404 || missing(text)) return true;
     // Some portal shells show the entire result in one same-origin frame.
     if (text) return false;
     const frames = Array.from(body.querySelectorAll("iframe")).filter(visible);

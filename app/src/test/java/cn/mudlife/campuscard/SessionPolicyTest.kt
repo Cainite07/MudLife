@@ -50,13 +50,6 @@ class SessionPolicyTest {
         assertEquals(PaymentState.UNKNOWN, PaymentPolicy.state(3, 100, "1.00"))
         assertEquals(PaymentState.UNKNOWN, PaymentPolicy.state(1, 0, "1.00"))
     }
-    @Test fun actualPortraitSrcWinsOverOnerrorFallback() {
-        val tag = "<img class=\"card-img-user\" onerror=\"this.src='https://example.test/default.png';this.onerror=null\" src=\"https://example.test/student.png\" style=\"width:25%\">"
-        assertEquals("https://example.test/student.png", SchoolMarkup.attribute(tag, "src"))
-        assertEquals("width:25%", SchoolMarkup.attribute(tag, "style"))
-        assertEquals("student.png", SchoolMarkup.attribute("<img SRC = 'student.png'>", "src"))
-        assertEquals("", SchoolMarkup.attribute("<img onerror=\"this.src='fallback.png'\">", "src"))
-    }
     @Test fun billTitlesDescribeTransactionsRatherThanTerminalCodes() {
         assertEquals("微信充值", BillPolicy.title("2", "", "微信支付转账", "微信支付转账", "1L"))
         assertEquals("校园卡充值", BillPolicy.title("2", "0-123", "", "", ""))

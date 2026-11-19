@@ -69,6 +69,27 @@ class TeachingRoutesTest {
         assertNull(gateway.getQueryParameter("gateway"))
     }
 
+    @Test fun onlyTheRegistrarsTicketCallbackCanRecoverFromHttp500() {
+        val callback = Uri.parse(TeachingRoutes.login(proxied) + "?ticket=sample")
+        assertTrue(TeachingRoutes.isTeachingCallback(callback))
+        assertFalse(TeachingRoutes.isTeachingCallback(Uri.parse(TeachingRoutes.login(proxied))))
+        assertFalse(TeachingRoutes.isTeachingCallback(Uri.parse(TeachingRoutes.course(proxied) + "&ticket=sample")))
+        assertFalse(TeachingRoutes.isTeachingCallback(Uri.parse("https://example.org/sso/jziotlogin?ticket=sample")))
+        val landing = TeachingLanding()
+        landing.observe(callback)
+        assertEquals(TeachingRoutes.course(proxied), landing.missingPageTarget(callback, proxied))
+        assertTrue(landing.consume())
+        assertNull(landing.missingPageTarget(callback, proxied))
+    }
+
+    @Test fun labelsVpnAndTeachingAuthenticationAsSeparateSteps() {
+        val proxyCas = TeachingRoutes.VPN + "https/77726476706e69737468656265737421e0f6528f69256243300d8db9d6562d"
+        assertEquals(TeachingRoutes.AuthStep.WEB_VPN, TeachingRoutes.authStep(Uri.parse(TeachingRoutes.schoolGatewayLogin())))
+        assertEquals(TeachingRoutes.AuthStep.TEACHING, TeachingRoutes.authStep(casPage(proxyCas, TeachingRoutes.login(proxied))))
+        assertEquals(TeachingRoutes.AuthStep.TEACHING, TeachingRoutes.authStep(Uri.parse("$proxied/xtgl/login_slogin.html")))
+        assertNull(TeachingRoutes.authStep(Uri.parse(TeachingRoutes.course(proxied))))
+    }
+
     @Test fun gatewayCallbackSupportsTokenLoginAndMobilePortal() {
         val vpn = TeachingRoutes.VPN
         assertTrue(TeachingRoutes.isGatewayCallback(Uri.parse(vpn + "login?cas_login=true")))

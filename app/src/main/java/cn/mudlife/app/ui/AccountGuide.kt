@@ -32,13 +32,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import cn.mudlife.app.R
+import cn.mudlife.app.utils.AccountGuideRun
 import cn.mudlife.app.ui.theme.AppColors
 
 @Composable
 internal fun AccountGuide(
     school: Boolean, campus: Boolean, logistics: Boolean,
-    schoolExpired: Boolean, logisticsExpired: Boolean, presentation: Int, contentInsets: PaddingValues,
-    onSelect: (String) -> Unit, onFinish: (Boolean) -> Unit
+    schoolExpired: Boolean, logisticsExpired: Boolean, presentation: AccountGuideRun, contentInsets: PaddingValues,
+    leaving: Boolean, onSelect: (String) -> Unit, onContinue: (Boolean) -> Unit
 ) {
     val clock = remember(presentation) { Animatable(0f) }
     LaunchedEffect(clock) { clock.animateTo(1f, tween(2600, easing = LinearEasing)) }
@@ -89,16 +90,16 @@ internal fun AccountGuide(
                 Spacer(Modifier.height(sectionGap))
                 Column(Modifier.fillMaxWidth().reveal(clock, .49f, .87f)) {
                     AccountRow("学校账号", "课表 · 一卡通 · 电费", Icons.Outlined.School, school, schoolExpired,
-                        enabled = rowsReady, showProgress = true) { onSelect("school") }
+                        enabled = rowsReady && !leaving, showProgress = true) { onSelect("school") }
                     GuideDivider()
                     AccountRow("趣智校园", "饮水 · 吹风机", Icons.Outlined.WaterDrop, campus,
-                        enabled = rowsReady, showProgress = true) { onSelect("life") }
+                        enabled = rowsReady && !leaving, showProgress = true) { onSelect("life") }
                     GuideDivider()
                     AccountRow("趣智后勤热水", "洗澡码", Icons.Outlined.Shower, logistics, logisticsExpired,
-                        enabled = rowsReady, showProgress = true) { onSelect("logistics") }
+                        enabled = rowsReady && !leaving, showProgress = true) { onSelect("logistics") }
                 }
             }
-            Button(onClick = { onFinish(completed) }, enabled = finishReady,
+            Button(onClick = { onContinue(completed) }, enabled = finishReady && !leaving,
                 modifier = Modifier.padding(vertical = 16.dp).fillMaxWidth().heightIn(min = 50.dp)
                     .reveal(clock, .68f, 1f),
                 shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(

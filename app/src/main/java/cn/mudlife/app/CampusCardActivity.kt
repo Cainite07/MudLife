@@ -1,5 +1,6 @@
 package cn.mudlife.app
 
+import cn.mudlife.app.utils.WebResourceCache
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -235,6 +236,7 @@ class CampusCardActivity : ComponentActivity() {
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
+                WebResourceCache.trimIfOversized(view)
                 if (view !== browser || pageError != null || (view.url != url && documentUrl != url) ||
                     CampusCardNavigation.decide(url) != CampusCardNavigation.Decision.Internal) return
                 val generation = documentGeneration

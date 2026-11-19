@@ -1,7 +1,5 @@
 package cn.mudlife.campuscard
 
-import cn.mudlife.app.BuildConfig
-
 import android.graphics.Bitmap
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -21,9 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -123,58 +118,6 @@ import java.time.YearMonth
         Switch(checked = vm.startupCode, onCheckedChange = vm::updateStartupCode)
     }
 }
-@Composable internal fun ProfilePage(vm: CampusViewModel, login: () -> Unit, logout: () -> Unit, electric: () -> Unit) {
-    Refreshable(vm.identityBusy, { vm.loadIdentity(true) }) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            val identity = vm.identity
-            if (identity != null) {
-                StudentCard(identity)
-                if (identity.portrait == null) TextButton(onClick = { vm.loadIdentity(true) }, enabled = !vm.identityBusy) { Text("照片未加载，重试") }
-            }
-            else Paper {
-                Text("电子学生卡", fontFamily = FontFamily.Serif, fontSize = 19.sp)
-                if (vm.identityBusy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 22.dp))
-                vm.identityError?.let { Text(it, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)); TextButton(onClick = { vm.loadIdentity(true) }) { Text("重试") } }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                Text("其他功能", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
-                Paper { ProfileRow("电费", Icons.Outlined.Bolt, electric) }
-            }
-            Paper {
-                ProfileRow("更新学校认证", Icons.Outlined.Lock, login)
-                HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                ProfileRow("退出登录", Icons.Outlined.Logout, logout)
-            }
-            Text("泥浆校园卡  ${BuildConfig.VERSION_NAME}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 20.dp))
-        }
-    }
-}
-@Composable private fun ProfileRow(title: String, icon: ImageVector, action: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = action).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary); Text(title, fontSize = 15.sp, modifier = Modifier.weight(1f).padding(start = 14.dp)); Icon(Icons.Outlined.ChevronRight, null, Modifier.size(19.dp))
-    }
-}
-@Composable internal fun StudentCard(card: StudentIdentity) {
-    if (card.background != null) {
-        BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(card.background.width.toFloat() / card.background.height).clip(RoundedCornerShape(16.dp))) {
-            Image(card.background.asImageBitmap(), "学校电子学生卡卡面", Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
-            val w = maxWidth; val h = maxHeight
-            card.portrait?.let { Image(it.asImageBitmap(), "本人照片", Modifier.offset(w * card.portraitX, h * card.portraitY).width(w * card.portraitWidth).aspectRatio(it.width.toFloat() / it.height).clip(RoundedCornerShape(3.dp)), contentScale = ContentScale.Crop) }
-            val fontScale = LocalDensity.current.fontScale
-            card.texts.forEach { t ->
-                Text(t.text, color = Color(t.color), fontSize = (t.size * w.value / 375f / fontScale).sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                    modifier = Modifier.offset(w * t.x, h * t.y).width(w * (1f - t.x).coerceAtLeast(.01f)), overflow = TextOverflow.Clip)
-            }
-        }
-        if (card.texts.isEmpty()) Paper { Text(card.name, fontSize = 19.sp); Text(card.number, fontSize = 14.sp); Text(card.department, fontSize = 13.sp) }
-    } else Paper {
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            card.portrait?.let { Image(it.asImageBitmap(), "本人照片", Modifier.width(74.dp).aspectRatio(.75f).clip(RoundedCornerShape(5.dp)), contentScale = ContentScale.Crop) }
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) { Text(card.name, fontSize = 20.sp); Text(card.number, fontSize = 14.sp); Text(card.department, fontSize = 13.sp); Text(card.identity, fontSize = 13.sp) }
-        }
-    }
-}
-
 @Composable internal fun BillsPage(vm: CampusViewModel) {
     var detail by remember { mutableStateOf<Bill?>(null) }
     var monthMenu by remember { mutableStateOf(false) }

@@ -31,6 +31,19 @@ internal object TeachingRoutes {
         .appendQueryParameter("service", VPN + "login?cas_login=true")
         .build().toString()
 
+    enum class AuthStep { WEB_VPN, TEACHING }
+
+    fun authStep(uri: Uri): AuthStep? {
+        if (isGatewayLogin(uri)) return AuthStep.WEB_VPN
+        val currentPage = page(uri)
+        if (currentPage?.isAcademic == true && currentPage.isLogin) return AuthStep.TEACHING
+        if (uri.path?.endsWith("/cas/login") != true) return null
+        val service = uri.getQueryParameter("service")?.let(Uri::parse) ?: return null
+        if (uri.scheme == "https" && uri.host == "pass.ujs.edu.cn" &&
+            isGatewayCallback(service)) return AuthStep.WEB_VPN
+        return AuthStep.TEACHING.takeIf { currentPage != null && page(service)?.isAcademic == true }
+    }
+
     data class Page(val base: String, val path: String) {
         val isLogin get() = path.startsWith("/xtgl/login")
         val isTeachingHomeCandidate get() = path.startsWith("/xtgl/") && !path.contains("login", ignoreCase = true)
@@ -45,6 +58,11 @@ internal object TeachingRoutes {
             "webvpn.ujs.edu.cn" -> proxyPath.matchEntire(path)?.let { Page(VPN.dropLast(1) + it.groupValues[1], it.groupValues[2]) }
             else -> null
         }
+    }
+
+    fun isTeachingCallback(uri: Uri): Boolean {
+        val entry = page(uri) ?: return false
+        return entry.isAcademic && entry.path == SSO_PATH && !uri.getQueryParameter("ticket").isNullOrBlank()
     }
 
     fun bookmark(value: String?): String? {

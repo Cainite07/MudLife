@@ -1,19 +1,11 @@
 package cn.mudlife.campuscard
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.text.Html
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.Request
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.YearMonth
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 
 data class Bill(val id: String, val title: String, val time: String, val fen: Long?, val type: String,
     val typeName: String, val merchant: String, val payment: String, val balance: Long?, val direction: String = "", val description: String = "") {
@@ -59,71 +51,6 @@ suspend fun SchoolApi.bills(page: Int, month: YearMonth?, type: String, size: In
             r.clean("effectdateStr").ifBlank { r.clean("jndatetimeStr") }, r.longOrNull("tranamt"), r.clean("typeId"), typeName,
             merchant, r.clean("payName"), r.longOrNull("cardBalance"), r.clean("typeFrom"), r.clean("resume"))
     }, data.optInt("current", page), data.optInt("pages"), data.longOrNull("total"))
-}
-
-object SchoolMarkup {
-    // Consume whole quoted attributes so onerror="this.src='fallback'" cannot masquerade as src.
-    fun attribute(tag: String, name: String): String = Regex("([A-Za-z_:][-A-Za-z0-9_:.]*)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')")
-        .findAll(tag).firstOrNull { it.groupValues[1].equals(name, true) }
-        ?.let { it.groupValues[2].ifEmpty { it.groupValues[3] } }.orEmpty()
-}
-
-data class CardText(val text: String, val x: Float, val y: Float, val width: Float, val color: Long, val size: Float)
-data class StudentIdentity(val name: String, val number: String, val department: String, val identity: String,
-    val background: Bitmap?, val portrait: Bitmap?, val texts: List<CardText>, val portraitX: Float, val portraitY: Float, val portraitWidth: Float)
-
-/** School HTML is parsed as data; no school HTML or JavaScript is rendered in the profile. */
-suspend fun SchoolApi.identity(account: String): StudentIdentity = withContext(Dispatchers.IO) {
-    val user = get("/berserker-base/user").getJSONObject("data")
-    val styles = get("/berserker-app/cardStyle").optJSONObject("data")
-    val model = styles?.optJSONObject(account)?.clean("model").orEmpty()
-    fun tag(className: String) = Regex("<img\\b[^>]*class=[\"'][^\"']*\\b$className\\b[^\"']*[\"'][^>]*>", RegexOption.IGNORE_CASE).find(model)?.value.orEmpty()
-    fun attribute(tag: String, name: String) = SchoolMarkup.attribute(tag, name)
-    fun percent(style: String, name: String, default: Float) = Regex("(?:^|;)\\s*$name\\s*:\\s*([0-9.]+)%").find(style)?.groupValues?.get(1)?.toFloatOrNull()?.div(100f) ?: default
-    val bg = attribute(tag("card-img-bg"), "src")
-    val photo = tag("card-img-user")
-    val photoStyle = attribute(photo, "style")
-    val texts = Regex("<div\\b[^>]*class=[\"'][^\"']*card-(?:info|text)-custom[^\"']*[\"'][^>]*>(.*?)</div>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)).findAll(model).take(20).mapNotNull { match ->
-        val opening = match.value.substringBefore('>') + ">"
-        val style = attribute(opening, "style")
-        val spanStyle = Regex("<span[^>]*style=[\"']([^\"']*)").find(match.groupValues[1])?.groupValues?.get(1).orEmpty()
-        val content = Html.fromHtml(match.groupValues[1], Html.FROM_HTML_MODE_LEGACY).toString().trim()
-        if (content.isBlank()) null else CardText(content, percent(style, "left", 0f), percent(style, "top", 0f), percent(style, "width", .5f),
-            runCatching { android.graphics.Color.parseColor(Regex("(?:^|;)\\s*color\\s*:\\s*(#[A-Fa-f0-9]{6})").find(style)?.groupValues?.get(1) ?: "#000000").toLong() and 0xffffffff }.getOrDefault(0xff000000),
-            Regex("font-size:\\s*([0-9.]+)px").find(spanStyle)?.groupValues?.get(1)?.toFloatOrNull() ?: 14f)
-    }.toList()
-    val images = coroutineScope {
-        val background = async { schoolImage(bg) }
-        val portrait = async { schoolImage(attribute(photo, "src")) ?: schoolImage(user.clean("avatar")) }
-        background.await() to portrait.await()
-    }
-    StudentIdentity(user.clean("name"), user.clean("sno"), user.clean("departmentName"), user.clean("identityName"),
-        images.first, images.second, texts,
-        percent(photoStyle, "left", .09f), percent(photoStyle, "top", .33f), percent(photoStyle, "width", .25f))
-}
-private suspend fun SchoolApi.schoolImage(raw: String): Bitmap? = withContext(Dispatchers.IO) {
-    val url = (if (raw.startsWith('/')) SchoolApi.ORIGIN + raw else raw).toHttpUrlOrNull() ?: return@withContext null
-    if (url.scheme != "https" || url.host != "ykt.ujs.edu.cn" || url.port != 443 || url.username.isNotBlank() || url.password.isNotBlank()) return@withContext null
-    runCatching {
-        // School pictures use signed or public URLs; never forward the bearer token to an image host.
-        client.newCall(Request.Builder().url(url).build()).execute().use { r ->
-            if (!r.isSuccessful || r.body == null || r.body!!.contentLength() > 5_000_000) null
-            else {
-                val bytes = r.body!!.byteStream().use { input ->
-                    val output = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
-                    while (output.size() <= 5_000_000) { val read = input.read(buffer); if (read < 0) break; output.write(buffer, 0, read) }
-                    output.toByteArray()
-                }
-                if (bytes.size > 5_000_000) null else {
-                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-                    var sample = 1
-                    while (bounds.outWidth / sample > 1600 || bounds.outHeight / sample > 1600) sample *= 2
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
-                }
-            }
-        }
-    }.getOrNull()
 }
 
 data class ElectricOption(val id: String, val name: String)

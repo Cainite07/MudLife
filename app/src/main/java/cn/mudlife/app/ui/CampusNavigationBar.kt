@@ -97,7 +97,7 @@ internal fun RouteMotion(tab: Int, page: String, modifier: Modifier, content: @C
     val previous = remember(route) { last }
     SideEffect { last = route }
     val horizontal = previous.second.isEmpty() && page.isEmpty()
-    if (page == "setup" || tab == 1 && page.isEmpty()) {
+    if (page == "setup" || page.isEmpty() && (tab == 1 || previous.second == "setup")) {
         // Full-bleed pages supply their own transitions.
         // The timetable's full-bleed wallpaper and its wash share the native image view.
         // Translating that view uncovers a strip of the scaffold along the leading or trailing edge.

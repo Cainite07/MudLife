@@ -1,9 +1,29 @@
 package cn.mudlife.app.utils
 
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class UpdateManagerTest {
+    @get:Rule val temp = TemporaryFolder()
+
+    @Test fun removesInstalledDownloadsAndAbandonedPartsWhileKeepingInstallRetries() {
+        val previous = temp.newFile("mudlife_update_43.apk")
+        val installed = temp.newFile("mudlife_update_44.apk")
+        val pending = temp.newFile("mudlife_update_45.apk")
+        val partial = temp.newFile("mudlife_update_46.apk.part")
+        val unrelated = temp.newFile("other.apk")
+        val similarlyNamed = temp.newFile("mudlife_update_40.apk.bak")
+        UpdateManager.pruneUpdateFiles(temp.root, installedVersion = 44)
+        assertFalse(previous.exists())
+        assertFalse(installed.exists())
+        assertFalse(partial.exists())
+        assertTrue(pending.exists())
+        assertTrue(unrelated.exists())
+        assertTrue(similarlyNamed.exists())
+    }
+
     @Test fun manifestAllowsMissingOptionalFieldsWithoutNullCrashes() {
         val info = UpdateManager.parseManifest("""{"versionCode":34,"versionName":"1.4.5","downloadUrl":"https://example.com/app.apk","mirrors":null,"title":null,"changelog":null}""")!!
         assertEquals(emptyList<String>(), info.mirrors)

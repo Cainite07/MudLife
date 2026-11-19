@@ -29,9 +29,6 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
     var paymentChecking by mutableStateOf(false); private set
     private var paymentJob: Job? = null
     private var lastPaymentCheck = 0L
-    var identity by mutableStateOf<StudentIdentity?>(null); private set
-    var identityBusy by mutableStateOf(false); private set
-    var identityError by mutableStateOf<String?>(null); private set
     var billRecords by mutableStateOf(emptyList<Bill>()); private set
     val billTypes = BillPolicy.filters
     var billBusy by mutableStateOf(false); private set
@@ -121,7 +118,7 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
     fun authenticated() {
         if (authenticatedToken != session.token) {
             viewModelScope.coroutineContext.cancelChildren()
-            resetBills(); hideCode(); identity = null; identityError = null; identityBusy = false
+            resetBills(); hideCode()
             cards = emptyList(); config = null; methods = emptyList(); rules = null; rulesBusy = false
             resetElectric()
             busy = false; authenticatedToken = session.token
@@ -130,7 +127,7 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun selectCard(account: String) {
         if (!session.selectAccount(authenticatedToken, account, cards.find { it.account == account })) return
-        selected = account; hideCode(); methods = emptyList(); identity = null
+        selected = account; hideCode(); methods = emptyList()
         resetBills(); billMonth = BillPeriodPolicy.restore(session.billPeriod); favorites = readFavorites(); resetElectric()
     }
     fun selectMethod(id: String) { selectedMethod = id; generateCode() }
@@ -215,16 +212,6 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun updateStartupCode(value: Boolean) { startupCode = value; session.startupCode = value }
     fun updateBrightCode(value: Boolean) { brightCode = value; session.brightCode = value }
-    fun loadIdentity(force: Boolean = false) {
-        if (identityBusy || (!force && identity != null)) return
-        val account = currentCard?.account ?: return
-        identityBusy = true; identityError = null
-        viewModelScope.launch {
-            try { val fresh = api.identity(account); if (currentCard?.account == account) identity = fresh }
-            catch (e: Exception) { identityError = featureFailure(e, "电子学生卡暂时无法加载") }
-            finally { identityBusy = false }
-        }
-    }
     fun changeBillMonth(month: YearMonth?) {
         session.billPeriod = BillPeriodPolicy.save(month)
         if (month == billMonth) return
@@ -403,11 +390,11 @@ class CampusViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun logout() {
         viewModelScope.coroutineContext.cancelChildren()
-        busy = false; identityBusy = false; rulesBusy = false; authenticatedToken = ""
+        busy = false; rulesBusy = false; authenticatedToken = ""
         paymentJob?.cancel(); paymentNotice = null; paymentChecking = false
         resetBills()
         viewModelScope.launch { billArchive.clear() }
-        identity = null; favorites = emptyList(); resetElectric()
+        favorites = emptyList(); resetElectric()
         hideCode(); session.clear(); hasSession = false; needsLogin = false; cards = emptyList(); methods = emptyList()
         config = null; rules = null; updatedAt = 0; error = null
     }

@@ -9,6 +9,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -31,6 +34,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
@@ -45,14 +49,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.ProcessLifecycleOwner
 import cn.mudlife.app.BuildConfig
 import cn.mudlife.app.ui.theme.*
+import cn.mudlife.app.utils.AccountGuideRun
 import cn.mudlife.app.utils.PrefsHelper
 import cn.mudlife.app.utils.HapticHelper
 import cn.mudlife.app.utils.UpdateManager
 import cn.mudlife.campuscard.*
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 @Composable
 fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
@@ -68,57 +73,35 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     var loggedIn by rememberSaveable { mutableStateOf(PrefsHelper.isLoggedIn) }
     var phone by rememberSaveable { mutableStateOf(PrefsHelper.telephone) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var guideEnabled by remember { mutableStateOf(PrefsHelper.accountGuideEnabled) }
+    val guide = remember { PrefsHelper.accountGuide }
+    val hasAccount = loggedIn || life.isQzhqLoggedIn || campus.hasSession
+    var guideEnabled by remember { mutableStateOf(guide.enabled) }
     val replayGuide = BuildConfig.DEBUG && activity.intent.getBooleanExtra("preview_account_guide", false)
-    var guidePresentation by remember { mutableIntStateOf(0) }
+    val installedUpdate = remember(activity) {
+        @Suppress("DEPRECATION")
+        val info = activity.packageManager.getPackageInfo(activity.packageName, 0)
+        info.lastUpdateTime > info.firstInstallTime
+    }
+    var guideRun by rememberSaveable { mutableStateOf<AccountGuideRun?>(null) }
+    var guideChecked by rememberSaveable { mutableStateOf(false) }
     var showGuideLocation by rememberSaveable { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(when {
-        replayGuide -> "setup"
-        guideEnabled && PrefsHelper.accountGuideInProgress -> "setup"
-        guideEnabled && !PrefsHelper.accountGuideSeen && !loggedIn && !life.isQzhqLoggedIn && !campus.hasSession -> "setup"
+        replayGuide || guide.shouldShow(hasAccount, BuildConfig.VERSION_CODE, installedUpdate) -> "setup"
         campus.startupCode -> "card"
         else -> ""
     }) }
 
-    val openPendingGuide = {
-        guideEnabled = PrefsHelper.accountGuideEnabled
-        if (guideEnabled && (page == "setup" || PrefsHelper.accountGuideInProgress)) {
-            guidePresentation = PrefsHelper.recordAccountGuidePresentation()
-            guideEnabled = PrefsHelper.accountGuideEnabled
-            page = "setup"
-        } else if (page == "setup") {
-            page = ""
-        }
-    }
     LaunchedEffect(Unit) {
         life.checkUpdateOnStartup()
-        if (replayGuide) {
-            activity.intent.removeExtra("preview_account_guide")
-            PrefsHelper.setAccountGuideEnabled(true)
-            guideEnabled = true
+        if (replayGuide) activity.intent.removeExtra("preview_account_guide")
+        if (!guideChecked || replayGuide) {
+            guideChecked = true
+            val started = guide.start(hasAccount, BuildConfig.VERSION_CODE, installedUpdate)
+            guideRun = if (replayGuide) AccountGuideRun.MANUAL else started
+            guideEnabled = guide.enabled
+            if (guideRun != null) page = "setup"
+            else if (page == "setup") page = ""
         }
-        openPendingGuide()
-        if (page != "setup" && !PrefsHelper.accountGuideInProgress && !PrefsHelper.accountGuideSeen &&
-            (loggedIn || life.isQzhqLoggedIn || campus.hasSession)) {
-            PrefsHelper.accountGuideSeen = true
-            guideEnabled = PrefsHelper.accountGuideEnabled
-        }
-    }
-    DisposableEffect(Unit) {
-        val appLifecycle = ProcessLifecycleOwner.get().lifecycle
-        var returning = false
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_STOP -> returning = true
-                Lifecycle.Event.ON_START -> if (returning) {
-                    returning = false
-                    if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) openPendingGuide()
-                }
-                else -> Unit
-            }
-        }
-        appLifecycle.addObserver(observer)
-        onDispose { appLifecycle.removeObserver(observer) }
     }
     var campusLogin by rememberSaveable { mutableStateOf(false) }
     var featureBack by rememberSaveable { mutableIntStateOf(2) }
@@ -187,7 +170,6 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             page == "electric" -> campus.loadElectric()
             page == "recharge" -> campus.loadRechargeRules()
             page.isEmpty() && tab == 2 -> campus.enterBills()
-            page.isEmpty() && tab == 3 -> campus.loadIdentity()
             (onCardPage || tab == 0 && page.isEmpty()) &&
                 System.currentTimeMillis() - campus.updatedAt > 60000 -> campus.refresh()
         }
@@ -206,14 +188,19 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } }
     }
-    val finishSetup: (Boolean) -> Unit = { completed ->
-        if (completed) {
-            PrefsHelper.completeAccountGuide()
-            guideEnabled = false
-        } else if (guidePresentation == 2) {
-            showGuideLocation = true
+    val scope = rememberCoroutineScope()
+    val guideTransition = remember { Animatable(1f) }
+    var leavingGuide by remember { mutableStateOf(false) }
+    val enterHome: (Boolean) -> Unit = { remind ->
+        leavingGuide = true
+        scope.launch {
+            guideTransition.animateTo(0f, tween(100))
+            tab = 0
+            page = ""
+            guideTransition.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
+            leavingGuide = false
+            if (remind) showGuideLocation = true
         }
-        page = ""
     }
     val selectAccount: (String) -> Unit = {
         when {
@@ -225,12 +212,12 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     }
     val signedInAccounts = listOf(campus.hasSession && !campus.needsLogin, loggedIn, life.isQzhqLoggedIn).count { it }
     val setGuideEnabled: (Boolean) -> Unit = { enabled ->
-        PrefsHelper.setAccountGuideEnabled(enabled)
+        guide.setEnabled(enabled)
         guideEnabled = enabled
     }
     val back = {
         when (page) {
-            "setup" -> activity.finish()
+            "setup" -> if (!leavingGuide) activity.finish() else Unit
             "codes", "bath", "dryer" -> page = codesBack
             "recharge" -> { page = rechargeBack; tab = featureBack }
             "electric" -> { page = ""; tab = featureBack }
@@ -242,21 +229,33 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     val edgeRoot = page.isEmpty()
     Scaffold(containerColor = AppColors.Background, snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
         if (page.isEmpty() && !life.isShowering) {
-            CampusNavigationBar(tab) { tab = it }
+            Box(Modifier.graphicsLayer { alpha = guideTransition.value }) {
+                CampusNavigationBar(tab) { tab = it }
+            }
         }
     }) { insets ->
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            alpha = guideTransition.value
+            if (leavingGuide && page.isEmpty()) translationY = 6.dp.toPx() * (1f - alpha)
+        }) {
             val frame = if (edgeRoot || page == "setup") Modifier else Modifier.padding(insets).consumeWindowInsets(insets)
             RouteMotion(tab, page, frame) {
             pageState.SaveableStateProvider(page.ifEmpty { "tab:$tab" }) {
             when {
                 page == "setup" -> {
-                    if (guidePresentation > 0) AccountGuide(
+                    guideRun?.let { run -> AccountGuide(
                         school = campus.hasSession, campus = loggedIn, logistics = life.isQzhqLoggedIn,
                         schoolExpired = campus.needsLogin, logisticsExpired = life.qzhqSessionExpired,
-                        presentation = guidePresentation, contentInsets = insets,
-                        onSelect = selectAccount, onFinish = finishSetup
-                    )
+                        presentation = run, contentInsets = insets,
+                        leaving = leavingGuide, onSelect = selectAccount,
+                        onContinue = { completed ->
+                            if (!leavingGuide) {
+                                val remind = guide.finish(run, completed)
+                                guideEnabled = guide.enabled
+                                enterHome(remind)
+                            }
+                        }
+                    ) }
                 }
                 page in setOf("codes", "bath", "dryer") -> Column {
                     PageTitle(when (page) { "bath" -> "洗浴使用码"; "dryer" -> "吹风机使用码"; else -> "使用码" }, back = { page = codesBack })
@@ -322,7 +321,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
                 tab == 2 -> UnifiedBillsPage(campus, life, loggedIn, loginSchool, openRecharge,
                     logisticsLogin = { logisticsLogin = true },
                     pageInsets = if (edgeRoot) insets else PaddingValues(0.dp))
-                else -> UnifiedProfile(campus, accounts = { page = "accounts" },
+                else -> UnifiedProfile(accounts = { page = "accounts" },
                     signedInAccounts = signedInAccounts,
                     guideEnabled = guideEnabled, onGuideEnabled = setGuideEnabled,
                     checkingUpdate = life.isCheckingUpdate, updateAvailable = life.updateInfo != null,
@@ -462,7 +461,7 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
 }
 
 @Composable private fun UnifiedProfile(
-    vm: CampusViewModel, accounts: () -> Unit, signedInAccounts: Int,
+    accounts: () -> Unit, signedInAccounts: Int,
     guideEnabled: Boolean, onGuideEnabled: (Boolean) -> Unit,
     checkingUpdate: Boolean, updateAvailable: Boolean, checkUpdate: () -> Unit, pageInsets: PaddingValues
 ) {
@@ -477,11 +476,6 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(pageInsets).padding(horizontal = 22.dp).padding(bottom = 22.dp)) {
         PageTitle("我的", padded = false)
-        val identity = vm.identity
-        if (identity != null && !vm.needsLogin) {
-            StudentCard(identity)
-            Spacer(Modifier.height(12.dp))
-        }
         SettingsGroup {
             SettingsRow("账号管理", Icons.Outlined.ManageAccounts,
                 if (signedInAccounts == 0) "未登录" else "$signedInAccounts 项已登录", action = accounts)

@@ -1,5 +1,6 @@
 package cn.mudlife.app.timetable
 
+import cn.mudlife.app.utils.WebResourceCache
 import android.annotation.SuppressLint
 import android.animation.ValueAnimator
 import android.app.Activity
@@ -55,6 +56,7 @@ class TimetableImportActivity : Activity() {
     private lateinit var browser: WebView
     private lateinit var pages: FrameLayout
     private lateinit var status: TextView
+    private lateinit var progressRow: LinearLayout
     private lateinit var readButton: Button
     private lateinit var retryButton: Button
     private var generation = 0
@@ -78,7 +80,7 @@ class TimetableImportActivity : Activity() {
         super.onCreate(savedInstanceState)
         account = intent.getStringExtra(TimetableActivity.EXTRA_ACCOUNT)?.trim().orEmpty()
         if (account.isBlank()) {
-            Toast.makeText(this, "请先登录校园卡，再导入个人课表。", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "第 1 步 · 登录江大生活的学校账号后，再打开教务同步。", Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -94,12 +96,17 @@ class TimetableImportActivity : Activity() {
         bar.addView(heading("教务同步"), LinearLayout.LayoutParams(0, -2, 1f))
         bar.minimumHeight = dp(56)
         root.addView(bar, LinearLayout.LayoutParams(-1, -2))
+        progressRow = LinearLayout(this).apply {
+            setBackgroundColor(soft)
+            setPadding(dp(16), dp(4), dp(16), dp(1))
+        }
+        root.addView(progressRow, LinearLayout.LayoutParams(-1, -2))
         val step = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(soft)
-            setPadding(dp(16), dp(4), dp(8), dp(4))
+            setPadding(dp(16), dp(2), dp(8), dp(4))
         }
-        status = label("正在连接学校…", 14f).apply {
+        status = label("正在连接学校…", 13f).apply {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         step.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
@@ -278,11 +285,13 @@ class TimetableImportActivity : Activity() {
         teachingLanding.observe(Uri.parse(url))
         retryButton.visibility = View.GONE
         canRead(false)
+        showProgress(ImportProgress.CONNECTING)
         browser.loadUrl(url)
     }
 
     private fun openSchoolGatewayLogin() {
         triedGatewayLogin = true
+        showProgress(ImportProgress.WEB_VPN)
         retryButton.visibility = View.GONE
         canRead(false)
         browser.loadUrl(TeachingRoutes.schoolGatewayLogin())
@@ -299,26 +308,85 @@ class TimetableImportActivity : Activity() {
         old.stopLoading()
         old.destroy()
         retryButton.visibility = View.GONE
-        canRead(canonicalCoursePage(browser.url) != null)
+        val courseReady = canonicalCoursePage(browser.url) != null
+        canRead(courseReady)
+        browser.url?.let { updateProgress(Uri.parse(it), courseReady) }
         status.text = help(browser.url)
+    }
+
+    private enum class ImportProgress(val completed: Int, val current: Int?) {
+        CONNECTING(1, null), WEB_VPN(1, 2), TEACHING(2, 3), READY(3, null)
+    }
+
+    private var importProgress: ImportProgress? = null
+
+    private fun showProgress(progress: ImportProgress) {
+        if (importProgress == progress) return
+        importProgress = progress
+        progressRow.removeAllViews()
+        listOf("校园卡", "WebVPN", "本科教务").forEachIndexed { index, name ->
+            val step = index + 1
+            val completed = step <= progress.completed
+            val current = step == progress.current
+            val state = when {
+                completed -> "已完成"
+                current -> "进行中"
+                else -> "待完成"
+            }
+            val stepView = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(View(context).apply {
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(2).toFloat()
+                        setColor(when {
+                            completed -> primary
+                            current -> Color.argb(140, Color.red(primary), Color.green(primary), Color.blue(primary))
+                            else -> rule
+                        })
+                    }
+                }, LinearLayout.LayoutParams(-1, dp(3)))
+                addView(label("$step $name\n$state", 12f, medium = current).apply {
+                    setTextColor(if (completed || current) primary else muted)
+                    setPadding(0, dp(2), 0, 0)
+                })
+            }
+            progressRow.addView(stepView, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                if (step < 3) marginEnd = dp(8)
+            })
+        }
+    }
+
+    private fun updateProgress(uri: Uri, courseReady: Boolean = false) {
+        when {
+            courseReady -> showProgress(ImportProgress.READY)
+            TeachingRoutes.authStep(uri) == TeachingRoutes.AuthStep.WEB_VPN ||
+                TeachingRoutes.isGatewayCallback(uri) -> showProgress(ImportProgress.WEB_VPN)
+            TeachingRoutes.authStep(uri) == TeachingRoutes.AuthStep.TEACHING ||
+                TeachingRoutes.isGatewayPortal(uri) ||
+                TeachingRoutes.courseFromHome(uri) != null -> showProgress(ImportProgress.TEACHING)
+        }
+    }
+
+    private fun authHint(uri: Uri): String? = when (TeachingRoutes.authStep(uri)) {
+        TeachingRoutes.AuthStep.WEB_VPN -> "验证后还需单独登录本科教务。"
+        TeachingRoutes.AuthStep.TEACHING -> "请再次用学校账号登录，然后读取课表。"
+        null -> null
     }
 
     private fun help(url: String?): String {
         val uri = url?.let(Uri::parse)
-        if (uri?.path?.endsWith("/cas/login") == true) {
-            return "请在下方登录学校账号。"
-        }
+        uri?.let(::authHint)?.let { return it }
         return when {
             canonicalCoursePage(url) != null -> "正在核对个人课表…"
-            uri != null && TeachingRoutes.isGatewayCallback(uri) -> "正在继续连接本科教务…"
-            uri != null && TeachingRoutes.isGatewayLogin(uri) -> "可以使用学校账号进入 WebVPN。"
-            uri?.let { TeachingRoutes.page(it)?.isLogin } == true -> "请在下方登录本科教务。"
-            uri != null && TeachingRoutes.isGatewayPortal(uri) -> "请打开「新教务系统」。"
+            uri != null && TeachingRoutes.isGatewayCallback(uri) -> "正在完成 WebVPN 验证…"
+            uri != null && TeachingRoutes.isGatewayPortal(uri) -> "WebVPN 已连接。如未自动跳转，请打开「新教务系统」。"
             else -> "进入本科教务后可读取个人课表。"
         }
     }
 
-    private fun openFromTeachingLanding(view: WebView, uri: Uri, httpNotFound: Boolean = false) {
+    private fun openFromTeachingLanding(
+        view: WebView, uri: Uri, httpStatus: Int = 0, onUnmatched: () -> Unit = {}
+    ) {
         if (!teachingLanding.pending) return
         val home = TeachingRoutes.courseFromHome(uri)
         val missing = teachingLanding.missingPageTarget(uri, academicBase)
@@ -329,12 +397,12 @@ class TimetableImportActivity : Activity() {
         fun checkLanding(attempt: Int) {
             view.postDelayed({
                 if (!isCurrent()) return@postDelayed
-                view.evaluateJavascript("($landingCheck)(${home != null}, ${missing != null}, $httpNotFound)") { matched ->
+                view.evaluateJavascript("($landingCheck)(${home != null}, ${missing != null}, $httpStatus)") { matched ->
                     if (!isCurrent()) return@evaluateJavascript
                     if (matched == "true" && teachingLanding.consume()) {
                         status.text = "正在打开个人课表…"
                         view.loadUrl(course)
-                    } else if (attempt < 5) checkLanding(attempt + 1)
+                    } else if (attempt < 5) checkLanding(attempt + 1) else onUnmatched()
                 }
             }, if (attempt == 0) 350L else 700L)
         }
@@ -374,7 +442,7 @@ class TimetableImportActivity : Activity() {
                     if (!isCurrent()) return@evaluateJavascript
                     if (catalog == "true") {
                         continueToCourse = false
-                        status.text = "正在打开本科教务…"
+                        status.text = "WebVPN 已连接，正在打开本科教务…"
                         view.loadUrl(TeachingRoutes.login(academicBase))
                     } else if (attempt < 5) {
                         checkPortal(attempt + 1)
@@ -435,7 +503,7 @@ class TimetableImportActivity : Activity() {
         webViewClient = object : WebViewClient() {
             private var failed = false
             private var mainDocument: String? = null
-            private var missingDocument: String? = null
+            private var missingDocument: Pair<String, Int>? = null
             private var finishedDocument: String? = null
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 if (!request.isForMainFrame) return false
@@ -488,7 +556,8 @@ class TimetableImportActivity : Activity() {
                 generation++
                 preview?.dismiss()
                 canRead(false)
-                status.text = when {
+                updateProgress(uri)
+                status.text = authHint(uri) ?: when {
                     uri.host == "pass.ujs.edu.cn" -> "正在连接学校统一身份认证…"
                     canonicalCoursePage(url) != null -> "正在打开个人课表…"
                     TeachingRoutes.page(uri)?.isAcademic == true -> "正在连接本科教务…"
@@ -503,11 +572,13 @@ class TimetableImportActivity : Activity() {
             }
 
             override fun onPageFinished(view: WebView, url: String) {
+                WebResourceCache.trimIfOversized(view)
                 val uri = Uri.parse(url)
                 if (view !== browser || view.url != url || !allowed(uri) || failed) return
                 finishedDocument = url
-                if (missingDocument == url) {
-                    openFromTeachingLanding(view, uri, httpNotFound = true)
+                val missing = missingDocument
+                if (missing?.first == url) {
+                    recoverMissingDocument(view, uri, missing.second)
                     return
                 }
                 val gatewayLogin = TeachingRoutes.isGatewayLogin(uri)
@@ -516,7 +587,9 @@ class TimetableImportActivity : Activity() {
                     return
                 }
                 retryButton.visibility = if (gatewayLogin) View.VISIBLE else View.GONE
-                canRead(canonicalCoursePage(url) != null)
+                val courseReady = canonicalCoursePage(url) != null
+                canRead(courseReady)
+                updateProgress(uri, courseReady)
                 status.text = help(url)
                 recoverEmptyCallback(view, uri)
                 openFromGatewayPortal(view, uri)
@@ -543,12 +616,18 @@ class TimetableImportActivity : Activity() {
                 if (!request.isForMainFrame || view !== browser) return
                 val url = request.url.toString()
                 if (url != mainDocument && url != view.url) return
-                if (response.statusCode == 404 && teachingLanding.missingPageTarget(request.url, academicBase) != null) {
-                    missingDocument = url
-                    if (finishedDocument == url) openFromTeachingLanding(view, request.url, httpNotFound = true)
+                val code = response.statusCode
+                val canRecover = code == 404 || code == 500 && TeachingRoutes.isTeachingCallback(request.url)
+                if (canRecover && teachingLanding.missingPageTarget(request.url, academicBase) != null) {
+                    missingDocument = url to code
+                    if (finishedDocument == url) recoverMissingDocument(view, request.url, code)
                 } else {
                     reportFailure(view)
                 }
+            }
+
+            private fun recoverMissingDocument(view: WebView, uri: Uri, code: Int) {
+                openFromTeachingLanding(view, uri, httpStatus = code) { reportFailure(view) }
             }
 
             override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {

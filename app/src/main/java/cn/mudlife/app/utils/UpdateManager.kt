@@ -45,6 +45,25 @@ object UpdateManager {
         .callTimeout(10, TimeUnit.SECONDS)
         .build()
 
+    private var cachePrepared = false
+    private val updateArtifact = Regex("""mudlife_update_([0-9]+)\.apk(\.part)?""")
+
+    @Synchronized
+    fun prepareUpdateCache(context: Context) {
+        if (cachePrepared) return
+        pruneUpdateFiles(context.cacheDir, BuildConfig.VERSION_CODE)
+        cachePrepared = true
+    }
+
+    internal fun pruneUpdateFiles(cache: File, installedVersion: Int) {
+        cache.listFiles()?.forEach { file ->
+            if (!file.isFile) return@forEach
+            val match = updateArtifact.matchEntire(file.name) ?: return@forEach
+            val version = match.groupValues[1].toIntOrNull() ?: return@forEach
+            if (version <= installedVersion || match.groups[2] != null) file.delete()
+        }
+    }
+
     private val gson = Gson()
 
     internal val CHECK_URLS = listOf(
@@ -109,6 +128,7 @@ object UpdateManager {
         if (cn.mudlife.app.BuildConfig.DEBUG) {
             return@withContext Result.failure(IllegalStateException("修复预览版不下载正式版更新"))
         }
+        prepareUpdateCache(context)
         val destFile = File(context.cacheDir, "mudlife_update_${info.versionCode}.apk")
         if (destFile.isFile && runCatching { validateUpdate(context, destFile, info.versionCode) }.isSuccess) {
             return@withContext Result.success(destFile)

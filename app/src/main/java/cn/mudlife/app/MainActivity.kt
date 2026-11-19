@@ -15,6 +15,7 @@ import cn.mudlife.app.ui.UnifiedApp
 import cn.mudlife.app.ui.theme.*
 import cn.mudlife.app.utils.AppLogger
 import cn.mudlife.app.utils.PrefsHelper
+import cn.mudlife.app.utils.UpdateManager
 import cn.mudlife.campuscard.CampusViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,6 +35,7 @@ class MainActivity : ComponentActivity() {
             withContext(Dispatchers.IO) {
                 AppLogger.init(this@MainActivity)
                 PrefsHelper.init(this@MainActivity)
+                UpdateManager.prepareUpdateCache(this@MainActivity)
                 NetworkModule.restoreFromPrefs()
             }
             setContent {

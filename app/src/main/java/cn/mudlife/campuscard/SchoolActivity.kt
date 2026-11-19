@@ -1,5 +1,6 @@
 package cn.mudlife.campuscard
 
+import cn.mudlife.app.utils.WebResourceCache
 import cn.mudlife.app.BuildConfig
 import cn.mudlife.app.ui.PageTitle
 
@@ -190,6 +191,7 @@ class SchoolActivity : ComponentActivity() {
                 handler.removeCallbacksAndMessages(null)
             }
             override fun onPageFinished(view: WebView, url: String?) {
+                WebResourceCache.trimIfOversized(view)
                 if (failure || isFinishing || isDestroyed || !Navigation.web(url)) return
                 val u = Uri.parse(url)
                 if (cardLogin) checkCardLogin()

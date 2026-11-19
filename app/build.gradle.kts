@@ -51,6 +51,7 @@ android {
     buildTypes {
         debug {
             val guidePreview = providers.gradleProperty("guidePreview").orNull == "true"
+            if (guidePreview) ndk { abiFilters += "arm64-v8a" }
             applicationIdSuffix = if (guidePreview) ".guidepreview" else ".refresh"
             manifestPlaceholders["debugAppLabel"] = if (guidePreview) "江大生活·开场预览" else "@string/app_name"
             versionNameSuffix = "-refresh-preview"
@@ -117,7 +118,6 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.process)
 
     // Network
     implementation(libs.retrofit)

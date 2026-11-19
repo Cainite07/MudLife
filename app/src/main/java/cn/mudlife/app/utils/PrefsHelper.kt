@@ -16,33 +16,7 @@ object PrefsHelper {
         get() = prefs.getBoolean("touchFeedback", true)
         set(value) = prefs.edit().putBoolean("touchFeedback", value).apply()
 
-    var accountGuideSeen: Boolean
-        get() = prefs.getBoolean("accountGuideSeen", false)
-        set(value) = prefs.edit().putBoolean("accountGuideSeen", value).apply()
-
-    val accountGuideEnabled: Boolean
-        get() = prefs.getBoolean("accountGuideEnabled", !accountGuideSeen || accountGuideInProgress)
-
-    val accountGuideInProgress: Boolean
-        get() = prefs.getBoolean("accountGuideInProgress", false)
-
-    fun setAccountGuideEnabled(enabled: Boolean) {
-        val edit = prefs.edit().putBoolean("accountGuideEnabled", enabled)
-        if (enabled) edit.putInt("accountGuidePresentations", 0).putBoolean("accountGuideInProgress", true)
-        edit.apply()
-    }
-
-    fun recordAccountGuidePresentation(): Int {
-        val number = prefs.getInt("accountGuidePresentations", 0).coerceIn(0, 1) + 1
-        prefs.edit().putInt("accountGuidePresentations", number).putBoolean("accountGuideInProgress", true)
-            .putBoolean("accountGuideEnabled", number < 2).apply()
-        return number
-    }
-
-    fun completeAccountGuide() {
-        prefs.edit().putBoolean("accountGuideSeen", true).putBoolean("accountGuideEnabled", false)
-            .remove("accountGuideInProgress").apply()
-    }
+    internal val accountGuide get() = AccountGuidePreferences(prefs)
 
     fun init(context: Context) {
         val masterKey = try {
