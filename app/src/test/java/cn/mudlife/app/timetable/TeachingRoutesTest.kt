@@ -38,6 +38,17 @@ class TeachingRoutesTest {
         assertNotNull(TeachingRoutes.importSourceError(unknown, unknown, "A", "A"))
     }
 
+    @Test fun examPageUsesTheSameRegistrarWithoutSharingTheCourseRoute() {
+        val alternate = proxied.replace("/http/", "/https-8443/")
+        val exam = TeachingRoutes.exams(alternate)
+        assertEquals(exam, TeachingRoutes.examPage(exam + "&doType=query"))
+        assertEquals("N358105", Uri.parse(exam).getQueryParameter("gnmkdm"))
+        assertNull(TeachingRoutes.bookmark(exam))
+        assertNull(TeachingRoutes.examPage(TeachingRoutes.course(alternate)))
+        assertNull(TeachingRoutes.examPage(TeachingRoutes.exams(direct)))
+        assertNull(TeachingRoutes.examPage(TeachingRoutes.exams(TeachingRoutes.VPN + "http/1234567890abcdef")))
+    }
+
     @Test fun courseFollowsConfirmedHome() {
         fun from(base: String) =
             TeachingRoutes.courseFromHome(Uri.parse("$base/xtgl/index_initMenu.html"))

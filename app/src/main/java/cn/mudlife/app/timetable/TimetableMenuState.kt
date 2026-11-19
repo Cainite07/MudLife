@@ -11,6 +11,7 @@ internal fun saveMenus(entries: List<TimetableMenuEntry>): ArrayList<Bundle> = e
         putInt("id", entry.id)
         val type = when (val page = entry.panel) {
             TimetablePanel.Tools -> "tools"
+            TimetablePanel.Exams -> "exams"
             TimetablePanel.AddWidget -> "add-widget"
             TimetablePanel.Display -> "display"
             is TimetablePanel.DisplayGroup -> {
@@ -74,6 +75,7 @@ internal fun restoreMenus(saved: List<Bundle>, rows: List<SavedCourse>): List<Ti
 private fun Bundle.restorePanel(courses: Map<String, SavedCourse>): TimetablePanel? {
     return when (val type = getString("type")) {
         "tools" -> TimetablePanel.Tools
+        "exams" -> TimetablePanel.Exams
         "add-widget" -> TimetablePanel.AddWidget
         "display" -> TimetablePanel.Display
         "display-group" -> TimetableDisplayGroup.entries.find { it.name == getString("group") }?.let(TimetablePanel::DisplayGroup)

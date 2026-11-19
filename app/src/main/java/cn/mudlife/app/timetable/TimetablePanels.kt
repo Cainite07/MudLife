@@ -39,6 +39,7 @@ import java.time.LocalDate
 
 internal sealed interface TimetablePanel {
     data object Tools : TimetablePanel
+    data object Exams : TimetablePanel
     data object AddWidget : TimetablePanel
     data object Display : TimetablePanel
     data class DisplayGroup(val group: TimetableDisplayGroup) : TimetablePanel
@@ -195,7 +196,7 @@ internal fun MenuRow(icon: ImageVector, title: String, value: String = "", title
 }
 
 @Composable
-internal fun TimetableActions(term: String?, count: Int, selectTerm: () -> Unit, create: () -> Unit,
+internal fun TimetableActions(term: String?, count: Int, selectTerm: () -> Unit, exams: () -> Unit,
     sync: () -> Unit, courses: () -> Unit, settings: () -> Unit, bells: () -> Unit, widget: () -> Unit) {
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 10.dp)) {
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(AppColors.ActiveBg)
@@ -210,13 +211,13 @@ internal fun TimetableActions(term: String?, count: Int, selectTerm: () -> Unit,
         Spacer(Modifier.height(7.dp))
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(AppColors.Card).padding(vertical = 3.dp)) {
             Row(Modifier.fillMaxWidth()) {
-                ActionTile(Icons.Outlined.Add, "添加课程", create)
                 ActionTile(Icons.Outlined.Sync, "教务同步", sync)
                 ActionTile(Icons.Outlined.MenuBook, "全部课程", courses)
+                ActionTile(Icons.Outlined.Tune, "课表设置", settings, enabled = term != null)
             }
             Row(Modifier.fillMaxWidth()) {
-                ActionTile(Icons.Outlined.Tune, "课表设置", settings, enabled = term != null)
                 ActionTile(Icons.Outlined.Schedule, "上下课时间", bells)
+                ActionTile(Icons.Outlined.Assignment, "考试信息查询", exams)
                 ActionTile(Icons.Outlined.Widgets, "桌面小组件", widget)
             }
         }

@@ -73,12 +73,23 @@ class TimetableImportActivity : Activity() {
     private val schoolSession by lazy { SessionStore(this) }
     private val selectedTerm by lazy { intent.getStringExtra(TimetableActivity.EXTRA_TERM) }
 
+    private val examTerm by lazy { intent.getStringExtra(EXTRA_EXAM_TERM)?.let(ExamTerm::parse) }
+    private val readingExams get() = examTerm != null
+    private val importPageName get() = if (readingExams) "考试信息查询" else "个人课表"
+    private val examReader by lazy { assets.open("ujs-exams.js").bufferedReader().use { it.readText() } }
+    private var examStartedGeneration = -1
+    private var examReauthTried = false
+
     private val reader by lazy { assets.open("ujs-timetable.js").bufferedReader().use { it.readText() } }
     private val landingCheck by lazy { assets.open("ujs-teaching-landing.js").bufferedReader().use { it.readText() } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         account = intent.getStringExtra(TimetableActivity.EXTRA_ACCOUNT)?.trim().orEmpty()
+        if (intent.hasExtra(EXTRA_EXAM_TERM) && examTerm == null) {
+            finish()
+            return
+        }
         if (account.isBlank()) {
             Toast.makeText(this, "第 1 步 · 登录江大生活的学校账号后，再打开教务同步。", Toast.LENGTH_LONG).show()
             finish()
@@ -93,10 +104,11 @@ class TimetableImportActivity : Activity() {
             setPadding(dp(6), 0, dp(9), 0)
         }
         bar.addView(button("返回") { finish() })
-        bar.addView(heading("教务同步"), LinearLayout.LayoutParams(0, -2, 1f))
+        bar.addView(heading(if (readingExams) "导入考试信息" else "教务同步"), LinearLayout.LayoutParams(0, -2, 1f))
         bar.minimumHeight = dp(56)
         root.addView(bar, LinearLayout.LayoutParams(-1, -2))
         progressRow = LinearLayout(this).apply {
+            if (readingExams) visibility = View.GONE
             setBackgroundColor(soft)
             setPadding(dp(16), dp(4), dp(16), dp(1))
         }
@@ -110,7 +122,7 @@ class TimetableImportActivity : Activity() {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         step.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
-        readButton = button("读取课表") { inspect(manual = true) }.apply {
+        readButton = button(if (readingExams) "读取考试" else "读取课表") { inspectPage(manual = true) }.apply {
             isEnabled = false
             visibility = View.GONE
         }
@@ -263,7 +275,8 @@ class TimetableImportActivity : Activity() {
     private fun allowed(uri: Uri): Boolean = uri.scheme == "https" && uri.userInfo == null &&
         uri.port in setOf(-1, 443) && uri.host in TRUSTED_HOSTS
 
-    private fun canonicalCoursePage(value: String?) = TeachingRoutes.bookmark(value)
+    private fun canonicalImportPage(value: String?) =
+        if (readingExams) TeachingRoutes.examPage(value) else TeachingRoutes.bookmark(value)
 
     private fun addPage(): WebView {
         val page = createBrowser()
@@ -272,14 +285,19 @@ class TimetableImportActivity : Activity() {
     }
 
     private fun startImport() {
-        val url = TeachingRoutes.initial(entryPrefs.getString(COURSE_BOOKMARK, null))
+        val savedCourse = entryPrefs.getString(COURSE_BOOKMARK, null)
+        val url = if (readingExams) {
+            val base = TeachingRoutes.bookmark(savedCourse)?.let { TeachingRoutes.page(Uri.parse(it)) }?.base
+            TeachingRoutes.exams(base ?: TeachingRoutes.PROXIED)
+        } else TeachingRoutes.initial(savedCourse)
+        examReauthTried = false
         while (pages.childCount > 1) closePopup()
         generation++
         lastPresented = null
         triedGatewayHome = false
         triedGatewayLogin = false
         academicBase = TeachingRoutes.page(Uri.parse(url))?.base ?: TeachingRoutes.PROXIED
-        bookmarkBase = academicBase.takeIf { canonicalCoursePage(url) != null }
+        bookmarkBase = academicBase.takeIf { canonicalImportPage(url) != null }
         continueToCourse = true
         teachingLanding.reset()
         teachingLanding.observe(Uri.parse(url))
@@ -308,10 +326,11 @@ class TimetableImportActivity : Activity() {
         old.stopLoading()
         old.destroy()
         retryButton.visibility = View.GONE
-        val courseReady = canonicalCoursePage(browser.url) != null
+        val courseReady = canonicalImportPage(browser.url) != null
         canRead(courseReady)
         browser.url?.let { updateProgress(Uri.parse(it), courseReady) }
         status.text = help(browser.url)
+        if (readingExams && courseReady) inspectPage()
     }
 
     private enum class ImportProgress(val completed: Int, val current: Int?) {
@@ -321,7 +340,7 @@ class TimetableImportActivity : Activity() {
     private var importProgress: ImportProgress? = null
 
     private fun showProgress(progress: ImportProgress) {
-        if (importProgress == progress) return
+        if (readingExams || importProgress == progress) return
         importProgress = progress
         progressRow.removeAllViews()
         listOf("校园卡", "WebVPN", "本科教务").forEachIndexed { index, name ->
@@ -368,8 +387,9 @@ class TimetableImportActivity : Activity() {
     }
 
     private fun authHint(uri: Uri): String? = when (TeachingRoutes.authStep(uri)) {
-        TeachingRoutes.AuthStep.WEB_VPN -> "验证后还需单独登录本科教务。"
-        TeachingRoutes.AuthStep.TEACHING -> "请再次用学校账号登录，然后读取课表。"
+        TeachingRoutes.AuthStep.WEB_VPN -> if (readingExams) "请完成学校 WebVPN 验证。" else "验证后还需单独登录本科教务。"
+        TeachingRoutes.AuthStep.TEACHING -> if (readingExams) "请用学校账号验证，完成后会自动查询考试。"
+            else "请再次用学校账号登录，然后读取课表。"
         null -> null
     }
 
@@ -377,10 +397,10 @@ class TimetableImportActivity : Activity() {
         val uri = url?.let(Uri::parse)
         uri?.let(::authHint)?.let { return it }
         return when {
-            canonicalCoursePage(url) != null -> "正在核对个人课表…"
+            canonicalImportPage(url) != null -> if (readingExams) "正在查询考试安排…" else "正在核对个人课表…"
             uri != null && TeachingRoutes.isGatewayCallback(uri) -> "正在完成 WebVPN 验证…"
             uri != null && TeachingRoutes.isGatewayPortal(uri) -> "WebVPN 已连接。如未自动跳转，请打开「新教务系统」。"
-            else -> "进入本科教务后可读取个人课表。"
+            else -> "进入本科教务后可读取${importPageName}。"
         }
     }
 
@@ -391,6 +411,7 @@ class TimetableImportActivity : Activity() {
         val home = TeachingRoutes.courseFromHome(uri)
         val missing = teachingLanding.missingPageTarget(uri, academicBase)
         val course = missing ?: home ?: return
+        val target = if (readingExams) TeachingRoutes.exams(TeachingRoutes.page(Uri.parse(course))?.base ?: academicBase) else course
         val started = generation
         fun isCurrent() = view === browser && started == generation && view.url == uri.toString() &&
             teachingLanding.pending && !isFinishing && !isDestroyed
@@ -400,8 +421,8 @@ class TimetableImportActivity : Activity() {
                 view.evaluateJavascript("($landingCheck)(${home != null}, ${missing != null}, $httpStatus)") { matched ->
                     if (!isCurrent()) return@evaluateJavascript
                     if (matched == "true" && teachingLanding.consume()) {
-                        status.text = "正在打开个人课表…"
-                        view.loadUrl(course)
+                        status.text = "正在打开${importPageName}…"
+                        view.loadUrl(target)
                     } else if (attempt < 5) checkLanding(attempt + 1) else onUnmatched()
                 }
             }, if (attempt == 0) 350L else 700L)
@@ -474,8 +495,8 @@ class TimetableImportActivity : Activity() {
         // A query or dropdown selection can replace the timetable without a WebView navigation.
         // Keep normal page gestures and the explicit read action available.
         setOnTouchListener { _, event ->
-            if (event.actionMasked == MotionEvent.ACTION_UP && this === browser && readButton.isEnabled &&
-                canonicalCoursePage(url) != null && preview == null) inspect()
+            if (!readingExams && event.actionMasked == MotionEvent.ACTION_UP && this === browser && readButton.isEnabled &&
+                canonicalImportPage(url) != null && preview == null) inspect()
             false
         }
         webChromeClient = object : WebChromeClient() {
@@ -550,7 +571,7 @@ class TimetableImportActivity : Activity() {
                 }
                 if (view !== browser) return
                 retryButton.visibility = View.GONE
-                if (canonicalCoursePage(url) == null) bookmarkBase = null
+                if (canonicalImportPage(url) == null) bookmarkBase = null
                 TeachingRoutes.page(uri)?.takeIf { it.isAcademic }?.let { academicBase = it.base }
                 teachingLanding.observe(uri)
                 generation++
@@ -559,7 +580,7 @@ class TimetableImportActivity : Activity() {
                 updateProgress(uri)
                 status.text = authHint(uri) ?: when {
                     uri.host == "pass.ujs.edu.cn" -> "正在连接学校统一身份认证…"
-                    canonicalCoursePage(url) != null -> "正在打开个人课表…"
+                    canonicalImportPage(url) != null -> "正在打开${importPageName}…"
                     TeachingRoutes.page(uri)?.isAcademic == true -> "正在连接本科教务…"
                     uri.host == "webvpn.ujs.edu.cn" -> "正在连接学校 WebVPN…"
                     else -> "正在打开校方页面…"
@@ -568,7 +589,7 @@ class TimetableImportActivity : Activity() {
 
             override fun onPageCommitVisible(view: WebView, url: String) {
                 if (view !== browser || view.url != url) return
-                if (canonicalCoursePage(url) != null) bookmarkBase = null
+                if (canonicalImportPage(url) != null) bookmarkBase = null
             }
 
             override fun onPageFinished(view: WebView, url: String) {
@@ -587,14 +608,14 @@ class TimetableImportActivity : Activity() {
                     return
                 }
                 retryButton.visibility = if (gatewayLogin) View.VISIBLE else View.GONE
-                val courseReady = canonicalCoursePage(url) != null
+                val courseReady = canonicalImportPage(url) != null
                 canRead(courseReady)
                 updateProgress(uri, courseReady)
                 status.text = help(url)
                 recoverEmptyCallback(view, uri)
                 openFromGatewayPortal(view, uri)
                 openFromTeachingLanding(view, uri)
-                if (canonicalCoursePage(url) != null && preview == null) inspect()
+                if (courseReady && preview == null) inspectPage()
             }
 
             private fun reportFailure(view: WebView) {
@@ -637,6 +658,75 @@ class TimetableImportActivity : Activity() {
         }
     }
 
+    private fun inspectPage(manual: Boolean = false) {
+        val term = examTerm
+        if (term == null) inspect(manual = manual) else inspectExams(term, manual)
+    }
+
+    private fun inspectExams(term: ExamTerm, manual: Boolean) {
+        val view = browser
+        val url = view.url ?: return
+        val page = TeachingRoutes.examPage(url) ?: return
+        val base = TeachingRoutes.page(Uri.parse(page))?.base ?: return
+        if (!manual && examStartedGeneration == generation) return
+        examStartedGeneration = generation
+        val request = ++inspection
+        val atGeneration = generation
+        fun current() = !isFinishing && !isDestroyed && request == inspection &&
+            atGeneration == generation && view === browser && url == view.url
+        fun fail(message: String) {
+            status.text = message
+            canRead(true)
+        }
+
+        canRead(false)
+        status.text = "正在查询${term.label}的考试…"
+        val resultKey = JSONObject.quote("mudlifeExamResult$request")
+        val args = listOf(JSONObject.quote(page), JSONObject.quote(TeachingRoutes.course(base)),
+            term.year.toString(), term.semester.toString(), term.semesterCode.toString()).joinToString(",")
+        val script = "window[$resultKey] = null; ($examReader)($args).then(result => { window[$resultKey] = JSON.stringify(result); });"
+        fun poll(attempt: Int) {
+            if (!current()) return
+            view.evaluateJavascript("window[$resultKey] || null") { raw ->
+                if (!current()) return@evaluateJavascript
+                if (raw == null || raw == "null") {
+                    if (attempt < 48) view.postDelayed({ poll(attempt + 1) }, 500L)
+                    else fail("教务查询超时，请重试。")
+                    return@evaluateJavascript
+                }
+                try {
+                    val result = JSONObject(JSONTokener(raw).nextValue() as? String ?: throw JSONException("empty result"))
+                    when {
+                        result.optBoolean("auth") && !examReauthTried -> {
+                            examReauthTried = true
+                            teachingLanding.reset()
+                            status.text = "正在恢复教务登录…"
+                            view.loadUrl(TeachingRoutes.login(base))
+                        }
+                        result.optBoolean("auth") -> fail("教务登录已失效，请重新登录后重试。")
+                        result.has("error") -> fail(result.getString("error"))
+                        result.optString("student") != account -> fail("教务学号与当前校园卡账号不一致，请切换到同一账号。")
+                        currentAccount() -> {
+                            val rows = examEntries(result.getJSONArray("rows"))
+                            if (!ExamStore(this, account).save(term, rows)) {
+                                fail("考试信息保存失败，请重试。")
+                                return@evaluateJavascript
+                            }
+                            CookieManager.getInstance().flush()
+                            setResult(RESULT_OK, Intent().putExtra(EXTRA_EXAM_TERM, term.label))
+                            finish()
+                        }
+                    }
+                } catch (_: JSONException) {
+                    fail("学校返回的考试信息不完整，请重试。")
+                } catch (_: IllegalArgumentException) {
+                    fail("学校返回的考试信息不完整，请重试。")
+                }
+            }
+        }
+        view.evaluateJavascript(script) { if (current()) poll(0) }
+    }
+
     private data class Snapshot(val term: String, val records: List<ImportedCourse>,
                                 val pending: Int, val repeated: Int, val page: String?)
     private data class ConfirmedImport(val snapshot: Snapshot, val plan: TermImportPlan)
@@ -655,13 +745,13 @@ class TimetableImportActivity : Activity() {
         }.distinct()
         require(term.isNotBlank() && records.isNotEmpty())
         return Snapshot(term, records, result.getInt("pendingCount"), rows.length() - records.size,
-            canonicalCoursePage(result.optString("coursePage")))
+            TeachingRoutes.bookmark(result.optString("coursePage")))
     }
 
     private fun inspect(manual: Boolean = false, confirmed: ConfirmedImport? = null) {
         val view = browser
         val url = view.url
-        val openPage = canonicalCoursePage(url) ?: return
+        val openPage = canonicalImportPage(url) ?: return
         if (!readButton.isEnabled) return
         val request = ++inspection
         val atGeneration = generation
@@ -802,6 +892,7 @@ class TimetableImportActivity : Activity() {
     }
 
     companion object {
+        internal const val EXTRA_EXAM_TERM = "examTerm"
         private const val COURSE_BOOKMARK = "confirmed_course_page"
         private val TRUSTED_HOSTS = setOf("webvpn.ujs.edu.cn", "jwc.ujs.edu.cn", "pass.ujs.edu.cn")
     }

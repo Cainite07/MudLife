@@ -66,7 +66,7 @@ internal fun matchAnonymous(
     return result
 }
 
-private fun digest(value: String): String = Base64.encodeToString(
+internal fun digest(value: String): String = Base64.encodeToString(
     MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)),
     Base64.NO_WRAP or Base64.NO_PADDING or Base64.URL_SAFE
 )

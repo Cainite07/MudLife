@@ -4,7 +4,7 @@
 
 <h1 align="center">江大生活 · Jiangda Life</h1>
 <p align="center"><b>校园日常，放在一起。</b><br>江苏大学一卡通 · 本科教务课表 · 趣智校园 · 趣智后勤热水</p>
-<p align="center">v1.5.3 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
+<p align="center">v1.5.4 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
 
 <p align="center">
   <a href="https://gitee.com/cainite/MudLife/releases"><b>Gitee 国内下载</b></a> &emsp;
@@ -60,6 +60,10 @@
 
 打开底栏「课表」，点右上角「更多功能 → 教务同步」，通过学校 WebVPN 进入本科教务。会话失效时按学校页面提示完成登录。应用读取个人课表后会列出待导入课程，核对学期和课程再点「确认导入」。也可以新建空白学期，从头添加课程。导入后的课程可以在本机修改。
 
+## 查询考试安排
+
+在「课表 → 更多功能 → 考试信息查询」选择学期，点「添加考试信息」或「更新考试信息」。应用复用本科教务会话，必要时会打开学校验证页，验证完成后自动继续查询。同步结果保存在本机，可以离线查看。
+
 ## 生活账单，一目了然
 
 ![校园卡余额与分类账单](assets/promo/bills.png)
@@ -85,7 +89,7 @@ Kotlin 2.0.21 · Compose / Material 3 · Retrofit / OkHttp · MQTT · CameraX / 
 ./gradlew assembleRelease
 ```
 
-正式版仅打包 **ARM64（arm64-v8a）**，文件名为 `MudLife-1.5.3.apk`，内置离线扫码模型。
+正式版仅打包 **ARM64（arm64-v8a）**，文件名为 `MudLife-1.5.4.apk`，内置离线扫码模型。
 
 正式构建需要维护者已有的固定签名，私钥与凭据不在仓库中。详见 [签名说明](signing/README.md) · [双平台发布](docs/RELEASING.md) · [宣传图制作](assets/promo/prompts.md)。
 

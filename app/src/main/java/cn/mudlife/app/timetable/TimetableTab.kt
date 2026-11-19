@@ -117,7 +117,10 @@ private fun TimetableContent(
                 restore = { saved -> create(saved) }
             )) { create(null) }
             val importer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                if (it.resultCode == Activity.RESULT_OK) controller.onImported(it.data?.getStringExtra(EXTRA_TERM))
+                if (it.resultCode == Activity.RESULT_OK) {
+                    if (it.data?.hasExtra(TimetableImportActivity.EXTRA_EXAM_TERM) == true) controller.onExamsImported()
+                    else controller.onImported(it.data?.getStringExtra(EXTRA_TERM))
+                }
             }
             val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                 if (uri != null) controller.onWallpaperPicked(uri)
@@ -168,6 +171,8 @@ private class TimetableController(
     var launchImport: (Intent) -> Unit = {}
     var launchPicker: () -> Unit = {}
     private val store = TimetableStore(activity, owner)
+    private val examStore = ExamStore(activity, owner)
+    private var examRevision by mutableIntStateOf(0)
     private val settings = TimetableSettings(activity, owner)
     private val appearance = TimetableAppearance(activity, owner, openPicker = { launchPicker() }) {
         refreshAppearance()
@@ -243,6 +248,8 @@ private class TimetableController(
         refresh()
     }
 
+    fun onExamsImported() { examRevision++ }
+
     fun onWallpaperPicked(uri: Uri) = checked { appearance.setWallpaper(uri) }
 
     @Composable
@@ -306,6 +313,7 @@ private class TimetableController(
         }
         val dayChanged = renderedDay != null && renderedDay != today
         if (dayChanged || returning) {
+            examRevision++
             val previousTerm = term
             val first = calendar()
             if (dayChanged && first != null && renderedDay?.let(first::weekOf) == week) week = 0
@@ -388,6 +396,12 @@ private class TimetableController(
         launchImport(Intent(activity, TimetableImportActivity::class.java).putExtra(EXTRA_ACCOUNT, owner).putExtra(EXTRA_TERM, term))
     }
 
+    private fun openExamImport(term: ExamTerm) {
+        launchImport(Intent(activity, TimetableImportActivity::class.java)
+            .putExtra(EXTRA_ACCOUNT, owner)
+            .putExtra(TimetableImportActivity.EXTRA_EXAM_TERM, term.label))
+    }
+
     private fun openMenu(page: TimetablePanel) {
         menus.add(TimetableMenuEntry(nextMenuId++, page))
     }
@@ -442,9 +456,19 @@ private class TimetableController(
     private fun drawPanel(page: TimetablePanel, dismiss: () -> Unit, pop: () -> Unit) {
         when (page) {
             TimetablePanel.Tools -> TimetableActions(term, rows.size, { openMenu(TimetablePanel.Seasons) },
-                { addCourse() }, { dismiss(); openImport() }, { openMenu(TimetablePanel.AllCourses) },
+                { openMenu(TimetablePanel.Exams) }, { dismiss(); openImport() }, { openMenu(TimetablePanel.AllCourses) },
                 { openMenu(TimetablePanel.Display) }, { openMenu(TimetablePanel.Bells) },
                 { openMenu(TimetablePanel.AddWidget) })
+            TimetablePanel.Exams -> {
+                val current = ExamTerm.current(today)
+                val choices = remember(terms, term, current, examRevision) {
+                    val schoolTerms = terms.mapNotNull { ExamTerm.parse(store.schoolTerm(it) ?: it) }
+                    (schoolTerms + examStore.cachedTerms() + current).distinct()
+                        .sortedWith(compareByDescending<ExamTerm> { it.year }.thenByDescending { it.semester })
+                }
+                val initial = term?.let { ExamTerm.parse(store.schoolTerm(it) ?: it) } ?: current
+                ExamPanel(choices, initial, examStore, examRevision, dismiss, ::openExamImport)
+            }
             TimetablePanel.AddWidget -> AddWidgetPanel(dismiss, remember(activity) { TodayTimetableWidget.supportsPin(activity) }) {
                 TodayTimetableWidget.requestPin(activity)
             }

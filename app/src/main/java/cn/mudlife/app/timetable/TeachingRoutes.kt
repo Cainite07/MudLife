@@ -8,12 +8,19 @@ internal object TeachingRoutes {
     const val PROXIED = VPN + "http/77726476706e69737468656265737421fae0598869256243300d8db9d6562d"
     private const val SSO_PATH = "/sso/jziotlogin"
     private const val COURSE_PATH = "/kbcx/xskbcx_cxXskbcxIndex.html"
+    private const val EXAM_PATH = "/kwgl/kscx_cxXsksxxIndex.html"
     private const val COURSE_MENU = "$COURSE_PATH?gnmkdm=N2151&layout=default"
     // A saved school menu can have a different WebVPN protocol or port prefix.
     private val proxyPath = Regex("""^(/https?(?:-[0-9]+)?/[a-fA-F0-9]{16,256})(/.*)$""")
 
     fun login(base: String) = base + SSO_PATH
     fun course(base: String) = base + COURSE_MENU
+    fun exams(base: String) = "$base$EXAM_PATH?gnmkdm=N358105&layout=default"
+
+    fun examPage(value: String?): String? {
+        val entry = value?.let { page(Uri.parse(it)) } ?: return null
+        return exams(entry.base).takeIf { entry.isAcademic && entry.path == EXAM_PATH }
+    }
     fun isGatewayLogin(uri: Uri) = uri.toString() == VPN + "login"
 
     fun isGatewayCallback(uri: Uri): Boolean = isGatewayOrigin(uri) && when (uri.path) {

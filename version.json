@@ -1,11 +1,11 @@
 {
-  "versionCode": 44,
-  "versionName": "1.5.3",
+  "versionCode": 45,
+  "versionName": "1.5.4",
   "releaseDate": "2026-11-19",
-  "title": "江大生活 · Jiangda Life v1.5.3",
-  "changelog": "· 宿舍电费新增校区选择，从江苏大学一卡通加载北固校区、校本部和综合楼宿舍。切换校区后重新选择对应的区域、楼栋和房间。\n· 修复开场引导顶部的背景断层，状态栏背后与页面背景同步渐变。\n· 更新后首次打开会播放一次启动引导，播放后自动关闭，不弹提示。首次设置完成后只提示一次，之后手动开关由用户控制。\n· 教务同步顶部显示紧凑的三步进度，区分 WebVPN 验证和本科教务登录。修复部分校方认证回跳提示页面不存在时无法继续的问题。\n· 移除「我的」页的电子学生卡，保留账号管理与校园卡付款功能。\n· 清理已安装的旧更新包和中断的下载文件；校方网页的资源缓存超出阈值时会清理，账单、课表及登录数据继续保留。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.3/MudLife-1.5.3.apk",
+  "title": "江大生活 · Jiangda Life v1.5.4",
+  "changelog": "· 课表的「更多功能」新增「考试信息查询」。按学期查看已同步的考试时间、考场等信息，已保存的安排可离线查看。\n· 考试同步复用本科教务登录。会话有效时，点一下即可查询并保存。会话失效时，完成学校验证后自动继续查询。\n· 考试列表统一课程名字体，学期集中在页首显示。移除课表工具菜单中重复的「添加课程」入口，右上角加号仍可添加课程。",
+  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.4/MudLife-1.5.4.apk",
   "mirrors": [
-    "https://gitee.com/cainite/MudLife/releases/download/v1.5.3/MudLife-1.5.3.apk"
+    "https://gitee.com/cainite/MudLife/releases/download/v1.5.4/MudLife-1.5.4.apk"
   ]
 }
