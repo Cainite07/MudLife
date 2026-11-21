@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">泥浆生活·修复预览</string>
+    <string name="debug_app_name">江大生活 · 调试</string>
+    <string name="guide_preview_app_name">江大生活 · 开场预览</string>
 </resources>

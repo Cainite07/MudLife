@@ -66,14 +66,17 @@ object UpdateManager {
 
     private val gson = Gson()
 
+    internal const val GITHUB_REPO_URL = "https://github.com/Cainite07/jiangdalife"
+    internal const val GITEE_REPO_URL = "https://gitee.com/cainite/jiangdalife"
+
     internal val CHECK_URLS = listOf(
-        "https://gitee.com/cainite/MudLife/raw/main/version.json",
-        "https://fastly.jsdelivr.net/gh/Cainite07/MudLife@main/version.json",
-        "https://gcore.jsdelivr.net/gh/Cainite07/MudLife@main/version.json",
-        "https://testingcf.jsdelivr.net/gh/Cainite07/MudLife@main/version.json",
-        "https://cdn.jsdelivr.net/gh/Cainite07/MudLife@main/version.json",
-        "https://ghproxy.net/https://raw.githubusercontent.com/Cainite07/MudLife/main/version.json",
-        "https://raw.githubusercontent.com/Cainite07/MudLife/main/version.json"
+        "$GITEE_REPO_URL/raw/main/version.json",
+        "https://fastly.jsdelivr.net/gh/Cainite07/jiangdalife@main/version.json",
+        "https://gcore.jsdelivr.net/gh/Cainite07/jiangdalife@main/version.json",
+        "https://testingcf.jsdelivr.net/gh/Cainite07/jiangdalife@main/version.json",
+        "https://cdn.jsdelivr.net/gh/Cainite07/jiangdalife@main/version.json",
+        "https://ghproxy.net/https://raw.githubusercontent.com/Cainite07/jiangdalife/main/version.json",
+        "https://raw.githubusercontent.com/Cainite07/jiangdalife/main/version.json"
     )
 
     internal fun parseManifest(text: String): UpdateInfo? = runCatching {
@@ -88,10 +91,12 @@ object UpdateManager {
 
     internal fun downloadUrls(info: UpdateInfo): List<String> {
         val official = info.downloadUrl.toHttpUrlOrNull()?.takeIf { it.isHttps && it.host == "github.com" && it.encodedPath.contains("/releases/download/") }
-        val domestic = official?.takeIf { it.encodedPath.startsWith("/Cainite07/MudLife/releases/download/") }
-            ?.let { "https://gitee.com/cainite/MudLife/releases/download/" + it.encodedPath.substringAfter("/releases/download/") }
+        // Older manifests can omit mirrors and still carry an original GitHub release URL.
+        val domestic = official?.takeIf {
+            it.pathSegments.take(2) in listOf(listOf("Cainite07", "jiangdalife"), listOf("Cainite07", "MudLife"))
+        }?.let { "$GITEE_REPO_URL/releases/download/" + it.encodedPath.substringAfter("/releases/download/") }
         fun proxy(url: String) = url.toHttpUrlOrNull()?.host in setOf("ghproxy.net", "ghfast.top")
-        return (listOfNotNull(domestic) + info.mirrors.filterNot(::proxy) + listOfNotNull(official?.toString()) +
+        return (info.mirrors.filterNot(::proxy) + listOfNotNull(domestic) + listOfNotNull(official?.toString()) +
             info.mirrors.filter(::proxy) + listOfNotNull(official?.let { "https://ghproxy.net/$it" },
                 official?.let { "https://ghfast.top/$it" }) + info.downloadUrl)
             .filter { it.toHttpUrlOrNull()?.isHttps == true }.distinct()
@@ -105,7 +110,7 @@ object UpdateManager {
 
     private suspend fun fetchManifest(url: String): UpdateInfo? = suspendCancellableCoroutine { continuation ->
         val call = client.newCall(Request.Builder().url(url)
-            .header("User-Agent", "MudLife-App/${BuildConfig.VERSION_NAME}").build())
+            .header("User-Agent", "JiangdaLife-App/${BuildConfig.VERSION_NAME}").build())
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {

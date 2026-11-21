@@ -1,5 +1,7 @@
 package cn.mudlife.app.ui
 
+import androidx.compose.ui.res.stringResource
+import cn.mudlife.app.R
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -446,7 +448,7 @@ fun UserScreen(
         Card(
             onClick = {
                 HapticHelper.tick(context)
-                UpdateManager.openBrowser(context, "https://github.com/Cainite07/MudLife")
+                UpdateManager.openBrowser(context, UpdateManager.GITHUB_REPO_URL)
             },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -509,7 +511,7 @@ fun UserScreen(
 
         Spacer(Modifier.height(2.dp))
         Text(
-            "江大生活 v${cn.mudlife.app.BuildConfig.VERSION_NAME} · 专注纯净校园生活",
+            stringResource(R.string.app_version_footer, stringResource(R.string.app_name), cn.mudlife.app.BuildConfig.VERSION_NAME),
             color = AppColors.TextSecondary.copy(alpha = 0.6f),
             fontSize = 12.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally)

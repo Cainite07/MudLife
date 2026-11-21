@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MudLife"
+rootProject.name = "JiangdaLife"
 include(":app")

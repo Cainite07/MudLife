@@ -10,7 +10,7 @@ import urllib.request
 
 
 def main():
-    print("MudLife Gitee 发布凭据配置")
+    print("江大生活 · Gitee 发布凭据配置")
     print("请使用 Gitee 的私人令牌，勾选 projects（仓库）和 user_info（账号信息）权限。")
     print("令牌输入不会显示；不写入项目文件，也不要发送到聊天中。")
     token = getpass.getpass("请输入 Gitee 私人令牌：").strip()

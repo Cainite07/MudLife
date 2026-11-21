@@ -1,4 +1,4 @@
-# MudLife permanent release identity
+# Jiangda Life permanent release identity
 
 The owner authorized replacement of the lost old signing key on 2026-10-15.
 The first release in this new signing series is 1.3.18 (version code 26).
@@ -28,4 +28,4 @@ Release builds stop if the key is missing or its certificate does not match the 
 Configure repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
 `KEYSTORE_BASE64` is a base64 encoding of the exact permanent PKCS12 file, not an encryption format.
 The workflow restores it only into the runner's temporary directory and uses environment variables.
-No secrets were uploaded as part of this local maintenance task.
+Gradle and the workflow keep their established signing environment variable names.

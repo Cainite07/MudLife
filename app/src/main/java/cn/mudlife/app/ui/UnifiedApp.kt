@@ -500,9 +500,9 @@ fun UnifiedApp(life: MainViewModel, campus: CampusViewModel) {
             SettingsRow("检查更新", Icons.Outlined.SystemUpdate, if (checkingUpdate) "检查中…" else "",
                 indicator = updateAvailable, action = checkUpdate)
             SettingsDivider()
-            SettingsRow("GitHub", Icons.Outlined.Code) { UpdateManager.openBrowser(context, "https://github.com/Cainite07/MudLife") }
+            SettingsRow("GitHub", Icons.Outlined.Code) { UpdateManager.openBrowser(context, UpdateManager.GITHUB_REPO_URL) }
             SettingsDivider()
-            SettingsRow("Gitee", Icons.Outlined.Download) { UpdateManager.openBrowser(context, "https://gitee.com/cainite/MudLife") }
+            SettingsRow("Gitee", Icons.Outlined.Download) { UpdateManager.openBrowser(context, UpdateManager.GITEE_REPO_URL) }
         }
     }
 }

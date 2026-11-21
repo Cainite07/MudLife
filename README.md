@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/mudlife-icon-preview.png" width="88" alt="MudLife 校园之门图标" />
+  <img src="assets/jiangda-life-icon-preview.png" width="88" alt="江大生活校园之门图标" />
 </p>
 
 <h1 align="center">江大生活 · Jiangda Life</h1>
@@ -7,10 +7,10 @@
 <p align="center">v1.5.4 &nbsp; · &nbsp; Android 8.0+ &nbsp; · &nbsp; Kotlin / Jetpack Compose</p>
 
 <p align="center">
-  <a href="https://gitee.com/cainite/MudLife/releases"><b>Gitee 国内下载</b></a> &emsp;
-  <a href="https://github.com/Cainite07/MudLife/releases"><b>GitHub Releases</b></a> &emsp;
+  <a href="https://gitee.com/cainite/jiangdalife/releases"><b>Gitee 国内下载</b></a> &emsp;
+  <a href="https://github.com/Cainite07/jiangdalife/releases"><b>GitHub Releases</b></a> &emsp;
   <a href="CHANGELOG.md">更新记录</a> &emsp;
-  <a href="https://github.com/Cainite07/MudLife/issues">问题反馈</a>
+  <a href="https://github.com/Cainite07/jiangdalife/issues">问题反馈</a>
 </p>
 
 ![校园日常，放在一起](assets/promo/overview.png)
@@ -76,7 +76,7 @@
 
 ## 下载与覆盖升级
 
-国内网络优先使用 [Gitee 发行版](https://gitee.com/cainite/MudLife/releases)，也可从 [GitHub Releases](https://github.com/Cainite07/MudLife/releases) 下载。两端提供相同 APK 与 SHA-256 校验文件；应用启动时自动检查更新，发现新版后会在「我的 → 检查更新」显示绿点。
+国内网络优先使用 [Gitee 发行版](https://gitee.com/cainite/jiangdalife/releases)，也可从 [GitHub Releases](https://github.com/Cainite07/jiangdalife/releases) 下载。两端提供相同 APK 与 SHA-256 校验文件；应用启动时自动检查更新，发现新版后会在「我的 → 检查更新」显示绿点。
 
 正式版包名为 `cn.mudlife.app`，沿用固定签名，正常覆盖升级保留本机登录和保存的数据。**1.3.18 之前的旧签名版本不能直接覆盖升级**；切换前请保存所需信息，卸载旧包会清除其数据。
 
@@ -86,10 +86,10 @@ Kotlin 2.0.21 · Compose / Material 3 · Retrofit / OkHttp · MQTT · CameraX / 
 
 ```bash
 ./gradlew testDebugUnitTest assembleDebug
-./gradlew assembleRelease
+./gradlew packageReleaseApk
 ```
 
-正式版仅打包 **ARM64（arm64-v8a）**，文件名为 `MudLife-1.5.4.apk`，内置离线扫码模型。
+正式版仅打包 **ARM64（arm64-v8a）**，内置离线扫码模型。v1.5.4 的已发布附件为 `MudLife-1.5.4.apk`。后续正式版本采用 `JiangdaLife-版本号.apk`。
 
 正式构建需要维护者已有的固定签名，私钥与凭据不在仓库中。详见 [签名说明](signing/README.md) · [双平台发布](docs/RELEASING.md) · [宣传图制作](assets/promo/prompts.md)。
 

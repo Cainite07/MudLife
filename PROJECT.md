@@ -1,12 +1,12 @@
-# 泥浆生活 (MudLife) — 项目架构与设计文档
+# 江大生活（Jiangda Life） — 项目架构与设计文档
 
 ## 项目概述
 
-**泥浆生活 (MudLife)** 是一款基于 Jetpack Compose 的现代化校园生活服务 Android 客户端。项目深度适配高校（包含江苏大学等高校多校区复杂后勤架构）生活服务生态，彻底突破官方与老旧客户端的分区隔离与账单缺失壁垒。
+**江大生活（Jiangda Life）** 是一款基于 Jetpack Compose 的现代化校园生活服务 Android 客户端。项目深度适配高校（包含江苏大学等高校多校区复杂后勤架构）生活服务生态，彻底突破官方与老旧客户端的分区隔离与账单缺失壁垒。
 
 | 项 | 值 |
 |---|---|
-| 应用名称 | 泥浆生活 (MudLife) |
+| 应用名称 | 江大生活（Jiangda Life） |
 | 包名 | `cn.mudlife.app` |
 | 版本 | v1.3.12 (Build 20) |
 | 技术栈 | Kotlin + Jetpack Compose + Material 3 + Liquid Glassmorphism |

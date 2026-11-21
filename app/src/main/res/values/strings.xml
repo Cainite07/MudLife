@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">江大生活</string>
+    <string name="app_version_footer">%1$s v%2$s · 专注纯净校园生活</string>
 </resources>

@@ -53,7 +53,7 @@ android {
             val guidePreview = providers.gradleProperty("guidePreview").orNull == "true"
             if (guidePreview) ndk { abiFilters += "arm64-v8a" }
             applicationIdSuffix = if (guidePreview) ".guidepreview" else ".refresh"
-            manifestPlaceholders["debugAppLabel"] = if (guidePreview) "江大生活·开场预览" else "@string/app_name"
+            manifestPlaceholders["debugAppLabel"] = if (guidePreview) "@string/guide_preview_app_name" else "@string/debug_app_name"
             versionNameSuffix = "-refresh-preview"
         }
         release {
@@ -87,7 +87,7 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach {
         val signing = android.signingConfigs.getByName("release")
         check(signing.storeFile?.isFile == true && !signing.storePassword.isNullOrBlank() &&
             !signing.keyAlias.isNullOrBlank() && !signing.keyPassword.isNullOrBlank()) {
-            "MudLife release signing is missing. Restore the permanent keystore and credentials; do not generate a replacement."
+            "Jiangda Life release signing is missing. Restore the permanent keystore and credentials; do not generate a replacement."
         }
         val keyStore = KeyStore.getInstance("PKCS12")
         signing.storeFile!!.inputStream().use { keyStore.load(it, signing.storePassword!!.toCharArray()) }
@@ -96,9 +96,20 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach {
             .digest(keyStore.getCertificate(signing.keyAlias).encoded)
             .joinToString("") { "%02x".format(it) }
         check(fingerprint == rootProject.file("signing/release-certificate.sha256").readText().trim()) {
-            "Wrong release signing identity. Restore the fixed MudLife key; do not rotate it."
+            "Wrong release signing identity. Restore the fixed Jiangda Life key; do not rotate it."
         }
     }
+}
+
+// Keep AGP's default output for tooling and stage the distribution APK separately.
+val releaseApkName = "JiangdaLife-${android.defaultConfig.versionName}.apk"
+tasks.register<Sync>("packageReleaseApk") {
+    group = "build"
+    description = "Stages the signed Jiangda Life APK under its distribution filename."
+    dependsOn("assembleRelease")
+    from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
+    into(layout.buildDirectory.dir("outputs/distribution"))
+    rename { releaseApkName }
 }
 
 dependencies {

@@ -93,7 +93,7 @@ def screen(kind):
     d=ScaledDraw(ImageDraw.Draw(image),3)
     text(d,(22,13),"9:41",11,bold=True)
     box(d,(309,16,328,25),None,2,INK);d.line((330,18,330,23),fill=INK);box(d,(312,19,324,22),INK,1)
-    title={"home":"泥浆生活","bills":"账单","card":"校园卡","codes":"使用码","accounts":"欢迎使用泥浆生活"}[kind]
+    title={"home":"江大生活","bills":"账单","card":"校园卡","codes":"使用码","accounts":"欢迎使用江大生活"}[kind]
     if kind=="codes":text(d,(22,57),"‹",27);text(d,(49,57),title,25)
     else:text(d,(22,57),title,25,bold=False)
     if kind=="bills":
@@ -204,17 +204,17 @@ def background(size=POSTER_SIZE):
 
 def footer(draw, width, height):
     text(draw,(70,height-52),"演示数据",18,MUTED)
-    text(draw,(width-70,height-52),"MudLife",18,GREEN,anchor="rt")
+    text(draw,(width-70,height-52),"Jiangda Life",18,GREEN,anchor="rt")
 
 
 def social_poster(output):
     import qrcode
     size=(1080,3800)
     poster=background(size);d=ImageDraw.Draw(poster)
-    brand=Image.open(ROOT/'assets/mudlife-icon-preview.png').convert('RGBA').resize((88,88),Image.Resampling.LANCZOS)
+    brand=Image.open(ROOT/'assets/jiangda-life-icon-preview.png').convert('RGBA').resize((88,88),Image.Resampling.LANCZOS)
     poster.alpha_composite(brand,(80,65))
-    text(d,(194,74),'泥浆生活',34,GREEN,bold=True)
-    text(d,(196,122),'MudLife',22,MUTED)
+    text(d,(194,74),'江大生活',34,GREEN,bold=True)
+    text(d,(196,122),'Jiangda Life',22,MUTED)
     text(d,(80,222),'校园日常，',66,GREEN,bold=True)
     text(d,(80,310),'放在一起。',66,GREEN,bold=True)
     text(d,(82,413),'校园卡付款 · 生活账单 · 饮水与使用码',27,MUTED)
@@ -241,16 +241,16 @@ def social_poster(output):
     text(d,(80,3390),'把校园日常，装进口袋。',35,GREEN,bold=True)
     text(d,(82,3461),'江苏大学校园生活客户端',24,MUTED)
     text(d,(82,3511),'Android 8.0+ · Gitee 国内下载',24,GREEN)
-    text(d,(82,3573),'gitee.com/cainite/MudLife',23,MUTED)
-    text(d,(82,3620),'GitHub：Cainite07 / MudLife',22,MUTED)
-    url='https://gitee.com/cainite/MudLife/releases'
+    text(d,(82,3573),'gitee.com/cainite/jiangdalife',23,MUTED)
+    text(d,(82,3620),'GitHub：Cainite07 / jiangdalife',22,MUTED)
+    url='https://gitee.com/cainite/jiangdalife/releases'
     qr=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M,box_size=6,border=4)
     qr.add_data(url);qr.make(fit=True)
     code=qr.make_image(fill_color=GREEN,back_color='white').convert('RGBA')
     poster.alpha_composite(code,(744,3410))
     text(d,(744+code.width/2,3410+code.height+12),'扫码下载',22,GREEN,anchor='mt')
     footer(d,*size)
-    target=output/'mudlife-social.png'
+    target=output/'jiangda-life-social.png'
     poster.convert('RGB').save(target,optimize=True)
     print(f'Exported {target.name}: {size[0]}x{size[1]}, fixed device size354x739; QR={url}')
 
@@ -267,8 +267,8 @@ def main():
         social_poster(output)
         return
     cover=background();d=ImageDraw.Draw(cover)
-    brand=Image.open(ROOT/'assets/mudlife-icon-preview.png').convert('RGBA').resize((96,96),Image.Resampling.LANCZOS)
-    cover.alpha_composite(brand,(82,70));text(d,(202,86),"泥浆生活",34,GREEN,bold=True);text(d,(204,134),"MudLife",20,MUTED)
+    brand=Image.open(ROOT/'assets/jiangda-life-icon-preview.png').convert('RGBA').resize((96,96),Image.Resampling.LANCZOS)
+    cover.alpha_composite(brand,(82,70));text(d,(202,86),"江大生活",34,GREEN,bold=True);text(d,(204,134),"Jiangda Life",20,MUTED)
     text(d,(82,292),"校园日常",70,GREEN,bold=True);text(d,(82,394),"放在一起",70,GREEN,bold=True)
     text(d,(85,522),"付款、账单、饮水与使用码",27,MUTED)
     for i,label in enumerate(["温暖纸色","轻触反馈","账号独立保存"]):
@@ -283,7 +283,7 @@ def main():
         box(d,(82,y,160,y+78),'#E8ECE3',39);icon(d,name,104,y+22,34)
         text(d,(192,y+1),title,29,GREEN,bold=True);text(d,(192,y+47),description,24,MUTED)
     billing.alpha_composite(brand.resize((72,72),Image.Resampling.LANCZOS),(82,790))
-    text(d,(175,802),'泥浆生活 · MudLife',24,GREEN)
+    text(d,(175,802),'江大生活 · Jiangda Life',24,GREEN)
     phone(billing,'bills',1110);footer(d,*POSTER_SIZE);billing.convert('RGB').save(output/'bills.png',optimize=True)
     daily=background();d=ImageDraw.Draw(daily)
     text(d,(76,52),"顺手使用，按需登录",54,GREEN,bold=True)
