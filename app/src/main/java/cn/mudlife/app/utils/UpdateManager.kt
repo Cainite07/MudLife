@@ -66,17 +66,17 @@ object UpdateManager {
 
     private val gson = Gson()
 
-    internal const val GITHUB_REPO_URL = "https://github.com/Cainite07/jiangdalife"
-    internal const val GITEE_REPO_URL = "https://gitee.com/cainite/jiangdalife"
+    internal const val GITHUB_REPO_URL = "https://github.com/Cainite07/JiangdaLife"
+    internal const val GITEE_REPO_URL = "https://gitee.com/cainite/JiangdaLife"
 
     internal val CHECK_URLS = listOf(
         "$GITEE_REPO_URL/raw/main/version.json",
-        "https://fastly.jsdelivr.net/gh/Cainite07/jiangdalife@main/version.json",
-        "https://gcore.jsdelivr.net/gh/Cainite07/jiangdalife@main/version.json",
-        "https://testingcf.jsdelivr.net/gh/Cainite07/jiangdalife@main/version.json",
-        "https://cdn.jsdelivr.net/gh/Cainite07/jiangdalife@main/version.json",
-        "https://ghproxy.net/https://raw.githubusercontent.com/Cainite07/jiangdalife/main/version.json",
-        "https://raw.githubusercontent.com/Cainite07/jiangdalife/main/version.json"
+        "https://fastly.jsdelivr.net/gh/Cainite07/JiangdaLife@main/version.json",
+        "https://gcore.jsdelivr.net/gh/Cainite07/JiangdaLife@main/version.json",
+        "https://testingcf.jsdelivr.net/gh/Cainite07/JiangdaLife@main/version.json",
+        "https://cdn.jsdelivr.net/gh/Cainite07/JiangdaLife@main/version.json",
+        "https://ghproxy.net/https://raw.githubusercontent.com/Cainite07/JiangdaLife/main/version.json",
+        "https://raw.githubusercontent.com/Cainite07/JiangdaLife/main/version.json"
     )
 
     internal fun parseManifest(text: String): UpdateInfo? = runCatching {
@@ -93,7 +93,10 @@ object UpdateManager {
         val official = info.downloadUrl.toHttpUrlOrNull()?.takeIf { it.isHttps && it.host == "github.com" && it.encodedPath.contains("/releases/download/") }
         // Older manifests can omit mirrors and still carry an original GitHub release URL.
         val domestic = official?.takeIf {
-            it.pathSegments.take(2) in listOf(listOf("Cainite07", "jiangdalife"), listOf("Cainite07", "MudLife"))
+            it.pathSegments.firstOrNull().equals("Cainite07", ignoreCase = true) &&
+                it.pathSegments.getOrNull(1).let { repo ->
+                    repo.equals("JiangdaLife", ignoreCase = true) || repo.equals("MudLife", ignoreCase = true)
+                }
         }?.let { "$GITEE_REPO_URL/releases/download/" + it.encodedPath.substringAfter("/releases/download/") }
         fun proxy(url: String) = url.toHttpUrlOrNull()?.host in setOf("ghproxy.net", "ghfast.top")
         return (info.mirrors.filterNot(::proxy) + listOfNotNull(domestic) + listOfNotNull(official?.toString()) +

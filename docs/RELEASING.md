@@ -1,12 +1,12 @@
 # Jiangda Life 双平台发布
 
-维护者每次正式发布都同步 GitHub `Cainite07/jiangdalife` 和 Gitee `cainite/jiangdalife`。脚本同步两端的源码提交、版本标签、标题 `Jiangda Life v版本号`、正式 APK 和 SHA-256 校验文件。Git 只同步源码及标签，发行附件通过两端 API 分别上传。
+维护者每次正式发布都同步 GitHub `Cainite07/JiangdaLife` 和 Gitee `cainite/JiangdaLife`。脚本同步两端的源码提交、版本标签、标题 `Jiangda Life v版本号`、正式 APK 和 SHA-256 校验文件。Git 只同步源码及标签，发行附件通过两端 API 分别上传。
 
 ## 一次性配置
 
 - GitHub 使用本机 Git Credential Manager 中已有的仓库凭据。
 - Gitee 使用有 `projects`、`user_info` 权限的私人令牌；运行 `python scripts/configure_gitee.py` 交互配置，令牌只保存到凭据管理器。GitHub 授权网页登录并不等于具有 Gitee API 发布凭据。
-- 两个 Git remote 分别为 `origin=https://github.com/Cainite07/jiangdalife.git` 和 `gitee=https://gitee.com/cainite/jiangdalife.git`。
+- 两个 Git remote 分别为 `origin=https://github.com/Cainite07/JiangdaLife.git` 和 `gitee=https://gitee.com/cainite/JiangdaLife.git`。
 - 沿用现有固定签名，见 [签名说明](../signing/README.md)。不要重新生成私钥，不要将凭据或签名私钥加入仓库。
 
 ## 每次发行

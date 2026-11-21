@@ -40,7 +40,7 @@ class UpdateManagerTest {
     @Test fun githubDownloadsHaveDirectFallbacksEvenWithoutManifestMirrors() {
         val url = "https://github.com/Cainite07/MudLife/releases/download/v1.4.5/MudLife-1.4.5.apk"
         val urls = UpdateManager.downloadUrls(UpdateInfo(versionCode = 34, downloadUrl = url, mirrors = listOf("https://ghproxy.net/$url")))
-        assertEquals("https://gitee.com/cainite/jiangdalife/releases/download/v1.4.5/MudLife-1.4.5.apk", urls.first())
+        assertEquals("https://gitee.com/cainite/JiangdaLife/releases/download/v1.4.5/MudLife-1.4.5.apk", urls.first())
         assertEquals(url, urls[1])
         assertEquals(4, urls.size)
         assertEquals("https://ghproxy.net/$url", urls[2])
@@ -53,11 +53,13 @@ class UpdateManagerTest {
     }
 
     @Test fun giteeDownloadsPrecedeThirdPartyGithubProxies() {
-        val direct = "https://gitee.com/cainite/jiangdalife/releases/download/v1.5.5/JiangdaLife-1.5.5.apk"
-        val github = "https://github.com/Cainite07/jiangdalife/releases/download/v1.5.5/JiangdaLife-1.5.5.apk"
+        val direct = "https://gitee.com/cainite/JiangdaLife/releases/download/v1.5.5/JiangdaLife-1.5.5.apk"
+        val github = "https://github.com/Cainite07/JiangdaLife/releases/download/v1.5.5/JiangdaLife-1.5.5.apk"
         val urls = UpdateManager.downloadUrls(UpdateInfo(versionCode = 46, downloadUrl = github, mirrors = listOf(direct)))
         assertEquals(direct, urls.first())
         assertEquals(github, urls[1])
-        assertEquals("https://gitee.com/cainite/jiangdalife/raw/main/version.json", UpdateManager.CHECK_URLS.first())
+        val previousCasing = github.replace("/Cainite07/JiangdaLife/", "/Cainite07/jiangdalife/")
+        assertEquals(direct, UpdateManager.downloadUrls(UpdateInfo(downloadUrl = previousCasing)).first())
+        assertEquals("https://gitee.com/cainite/JiangdaLife/raw/main/version.json", UpdateManager.CHECK_URLS.first())
     }
 }

@@ -14,8 +14,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CERT = (ROOT / 'signing/release-certificate.sha256').read_text(encoding='ascii').strip()
-GITHUB = 'https://github.com/Cainite07/jiangdalife'
-GITEE = 'https://gitee.com/cainite/jiangdalife'
+GITHUB = 'https://github.com/Cainite07/JiangdaLife'
+GITEE = 'https://gitee.com/cainite/JiangdaLife'
 REMOTES = {'origin': GITHUB + '.git', 'gitee': GITEE + '.git'}
 USER_AGENT = 'JiangdaLife-release'
 ENV = dict(os.environ, GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='Never')
@@ -42,8 +42,8 @@ def credential(host):
 class Api:
     def __init__(self, platform, token):
         self.platform, self.token = platform, token
-        self.base = ('https://api.github.com/repos/Cainite07/jiangdalife' if platform == 'github'
-                     else 'https://gitee.com/api/v5/repos/cainite/jiangdalife')
+        self.base = ('https://api.github.com/repos/Cainite07/JiangdaLife' if platform == 'github'
+                     else 'https://gitee.com/api/v5/repos/cainite/JiangdaLife')
 
     def request(self, path, method='GET', values=None, payload=None, content_type=None):
         url = path if path.startswith('https://') else self.base + path
@@ -95,7 +95,7 @@ class Api:
             url = release['upload_url'].split('{')[0] + '?' + urllib.parse.urlencode({'name': path.name})
             self.request(url, 'POST', payload=data, content_type='application/octet-stream')
         else:
-            boundary = 'jiangdalife-' + uuid.uuid4().hex
+            boundary = 'JiangdaLife-' + uuid.uuid4().hex
             start = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
                      f'filename="{path.name}"\r\nContent-Type: application/octet-stream\r\n\r\n').encode()
             self.request(suffix, 'POST', payload=start + data + f'\r\n--{boundary}--\r\n'.encode(),

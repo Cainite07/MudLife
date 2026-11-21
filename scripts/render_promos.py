@@ -241,9 +241,9 @@ def social_poster(output):
     text(d,(80,3390),'把校园日常，装进口袋。',35,GREEN,bold=True)
     text(d,(82,3461),'江苏大学校园生活客户端',24,MUTED)
     text(d,(82,3511),'Android 8.0+ · Gitee 国内下载',24,GREEN)
-    text(d,(82,3573),'gitee.com/cainite/jiangdalife',23,MUTED)
-    text(d,(82,3620),'GitHub：Cainite07 / jiangdalife',22,MUTED)
-    url='https://gitee.com/cainite/jiangdalife/releases'
+    text(d,(82,3573),'gitee.com/cainite/JiangdaLife',23,MUTED)
+    text(d,(82,3620),'GitHub：Cainite07 / JiangdaLife',22,MUTED)
+    url='https://gitee.com/cainite/JiangdaLife/releases'
     qr=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M,box_size=6,border=4)
     qr.add_data(url);qr.make(fit=True)
     code=qr.make_image(fill_color=GREEN,back_color='white').convert('RGBA')
