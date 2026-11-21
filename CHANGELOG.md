@@ -29,4 +29,4 @@
 - 新增课表页，支持从本科教务导入和手动编辑课程，可在桌面查看今日课表。
 - 首页整合校园卡付款、扫码出水、宿舍电费和使用码。
 
-更早的版本见 [GitHub Releases](https://github.com/Cainite07/JiangdaLife/releases) 或 [历史更新记录](https://github.com/Cainite07/JiangdaLife/blob/947c5e99f9dd5505759b6c7a0ca0a9878d52fcc9/CHANGELOG.md)。
+更早的发行版本见 [GitHub Releases](https://github.com/Cainite07/JiangdaLife/releases)。
