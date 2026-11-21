@@ -127,6 +127,16 @@ def verify_download(url, expected_path, direct=False):
           f'{expected_path.name}, {size} bytes, SHA256 {digest.hexdigest()}', flush=True)
 
 
+def verify_repository(api, remote):
+    expected_url = REMOTES[remote]
+    if any(git('remote', 'get-url', *options, '--all', remote) != expected_url
+           for options in ((), ('--push',))):
+        raise ValueError(f'{remote}: fetch and push remotes must use {expected_url}.')
+    expected_name = urllib.parse.urlsplit(expected_url[:-4]).path.lstrip('/')
+    if api.request('').get('full_name', '').casefold() != expected_name.casefold():
+        raise ValueError(f'{api.platform}: canonical repository does not match the release target.')
+
+
 def verify_apk(apk, version, code):
     if not apk.is_file():
         raise ValueError('Run :app:packageReleaseApk to build the signed distribution APK first.')
@@ -181,12 +191,7 @@ def main():
     # Read-only preflight: refuse unrelated branch histories and conflicting tags.
     untagged_remotes = []
     for api, remote in zip(apis, REMOTES):
-        expected_url = REMOTES[remote]
-        if any(git('remote', 'get-url', *options, '--all', remote) != expected_url
-               for options in ((), ('--push',))):
-            raise ValueError(f'{remote}: fetch and push remotes must use {expected_url}.')
-        if api.request('').get('html_url', '').lower() != expected_url[:-4].lower():
-            raise ValueError(f'{api.platform}: canonical repository does not match the release target.')
+        verify_repository(api, remote)
         git('fetch', remote, 'main')
         git('merge-base', '--is-ancestor', 'FETCH_HEAD', head)
         ref = 'refs/tags/' + tag
