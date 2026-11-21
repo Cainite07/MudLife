@@ -1,40 +1,53 @@
-# Jiangda Life 双平台发布
+# 江大生活发布指南
 
-维护者每次正式发布都同步 GitHub `Cainite07/JiangdaLife` 和 Gitee `cainite/JiangdaLife`。脚本同步两端的源码提交、版本标签、标题 `Jiangda Life v版本号`、正式 APK 和 SHA-256 校验文件。Git 只同步源码及标签，发行附件通过两端 API 分别上传。
+## 构建
 
-## 一次性配置
+使用 JDK 21、Android SDK 36 和 SDK Build Tools 35.0.0。通过 `ANDROID_HOME` 指定 Android SDK 路径，并使用项目的 Gradle Wrapper 运行任务。
 
-- GitHub 使用本机 Git Credential Manager 中已有的仓库凭据。
-- Gitee 使用有 `projects`、`user_info` 权限的私人令牌；运行 `python scripts/configure_gitee.py` 交互配置，令牌只保存到凭据管理器。GitHub 授权网页登录并不等于具有 Gitee API 发布凭据。
-- 两个 Git remote 分别为 `origin=https://github.com/Cainite07/JiangdaLife.git` 和 `gitee=https://gitee.com/cainite/JiangdaLife.git`。
-- 沿用现有固定签名，见 [签名说明](../signing/README.md)。不要重新生成私钥，不要将凭据或签名私钥加入仓库。
+```bash
+./gradlew :app:testDebugUnitTest :app:assembleDebug
+./gradlew :app:packageReleaseApk
+```
 
-## 每次发行
+Windows PowerShell 使用以下命令构建和测试。
 
-1. 检查未提交改动和版本基线，完成必要修改及适度验证。
-2. 同步 `app/build.gradle.kts`、`version.json`、README、CHANGELOG 的版本；`downloadUrl` 填写 GitHub 的对应 APK 地址，`mirrors` 第一项填写 Gitee 地址，应用优先使用国内源。
-3. 使用原签名运行 `:app:packageReleaseApk`，核对证书、包名、ARM64 架构和内置离线扫码模型。AGP 中间输出为 `app/build/outputs/apk/release/app-release.apk`，正式分发输出为 `app/build/outputs/distribution/JiangdaLife-版本号.apk`。
-4. 检查本次源码与宣传素材不含真实账号、二维码、使用码、会话、导出账单、私钥等信息。宣传图使用虚构演示数据并注明。
-5. 将本次完整成果提交到 Git，使工作区干净。不要把 APK 或构建目录加入 Git。
-6. 在仓库根目录运行 `python scripts/publish_release.py`。脚本先核对版本、包名、固定证书、凭据和两端 Git 历史，再同步标签，分别上传 APK 和 `SHA256SUMS.txt`。确认两端发行状态和附件字节一致后，将主分支及更新清单推到两端。
-7. 用相同提交和同一个 APK 重跑即可恢复中断的发行。保留已上传的同名附件，发现内容冲突时停止。Gitee 附件验证显式禁用本机代理。
+```powershell
+.\gradlew.bat --no-daemon '-Pkotlin.compiler.execution.strategy=in-process' :app:testDebugUnitTest :app:assembleDebug
+.\gradlew.bat --no-daemon '-Pkotlin.compiler.execution.strategy=in-process' :app:packageReleaseApk
+```
 
-脚本从 Git Credential Manager 读取令牌。校验文件生成在 `app/build/outputs/distribution/`，与正式 APK 同目录。
+调试包位于 `app/build/outputs/apk/debug/`。正式分发包位于 `app/build/outputs/distribution/JiangdaLife-版本号.apk`，适用于 Android 8.0 及以上的 ARM64 设备。
 
-## 公开说明
+## 正式签名
 
-README、CHANGELOG、version.json 和发行页正文面向使用者，只描述功能变化、兼容性、下载与升级信息。协作对话、授权过程、个人设备信息及操作流水不写入公开说明。维护文档保留可复用的技术约束与发布流程，不追加聊天记录。
+正式版的应用 ID 为 `cn.mudlife.app`。构建与发布脚本以 [证书指纹](../signing/release-certificate.sha256) 校验原发行签名。兼容同签名版本的覆盖升级，应用 ID、组件身份、本地数据文件与加密存储应保持兼容。较早使用不同证书的安装需要单独处理。
 
-## 应用内更新
+本机签名配置位于用户目录的 `.android/mudlife-signing.properties`，也可通过环境变量提供。
 
-更新检查并行读取 Gitee raw 与 GitHub/CDN 的 `main/version.json`，选取最高有效版本。下载候选优先采用清单中的直接镜像，安装前核对包名、版本号与当前安装包签名。仓库路径变化后，分别检查两端历史直链和旧客户端已经写死的 raw/CDN 入口，确认旧客户端仍能读取持续更新的清单。
+| 本机属性 | 环境变量 |
+| --- | --- |
+| `KEYSTORE_FILE` | `MUDLIFE_KEYSTORE_FILE` |
+| `KEYSTORE_PASSWORD` | `MUDLIFE_KEYSTORE_PASSWORD` |
+| `KEY_ALIAS` | `MUDLIFE_KEY_ALIAS` |
+| `KEY_PASSWORD` | `MUDLIFE_KEY_PASSWORD` |
 
-v1.5.4 已发布的附件名为 `MudLife-1.5.4.apk`。当前清单使用两端的新仓库路径，附件文件名、校验内容和标签沿用该版本的已发布记录。命名规则从下一次正式发行使用，新版本清单指向两端实际的 `JiangdaLife-版本号.apk`。
+GitHub Actions 在提交和 PR 上运行单元测试。维护者可通过 `build_release` 构建签名产物，使用原密钥对应的 `KEYSTORE_BASE64`、`KEYSTORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`。私钥、凭据和本机配置存放在仓库之外。
 
-当前固定证书 SHA-256：`00da3d63a98a2f73565b306c18c67ca2f4fe27fc2ae71599544f96593637c2df`。
+## 双平台发行
 
-## GitHub Actions
+- Git 远端使用 `origin` 对应 [GitHub](https://github.com/Cainite07/JiangdaLife)，`gitee` 对应 [Gitee](https://gitee.com/cainite/JiangdaLife)，两端使用 HTTPS 克隆地址。
+- 发布脚本通过 Git Credential Manager 读取授权。Gitee 使用具有 `projects` 和 `user_info` 权限的令牌，可运行 `python scripts/configure_gitee.py` 进行配置。
 
-push 和 pull request 自动运行单元测试。手动启用 `build_release` 时使用现有签名 Secrets 生成并上传发行 APK artifact。签名 Secrets 缺失时构建停止。两端发布由上述本机脚本完成，Gitee 令牌保留在本机凭据管理器。
+1. 同步 `app/build.gradle.kts`、`version.json`、README 和更新记录。新版本使用 `v版本号` 标签、`Jiangda Life v版本号` 标题和 `JiangdaLife-版本号.apk` 文件名。清单的主下载地址使用 GitHub，第一镜像使用 Gitee。
+2. 用原签名构建正式包，验证安装、更新和升级后的数据读取。提交发行内容，确认工作区干净。
+3. 运行 `python scripts/publish_release.py`。脚本核验 APK 包名、版本、签名、ARM64 库及离线扫码模型，向两端提交同一标签与 APK，并生成和上传 `SHA256SUMS.txt`。
+4. 两端发行状态和公开附件校验通过后，脚本将更新清单推送至两端 `main`。若发布中断，用相同提交和相同 APK 重试。已有同名附件内容不一致时停止核对。
 
-个人构建代理应写在本机 `~/.gradle/gradle.properties`，不得把 `127.0.0.1` 等仅本机可用的代理地址写入项目的公共配置，否则 GitHub runner 无法下载 Gradle。发行源码以对应版本标签为准；发行后仅修复构建配置时，无需替换已经校验的 APK 或移动已发布标签。
+应用并行检查两端更新清单及备用源，安装前核对包名、版本号和签名。调整发行路径或附件名称时，验证旧客户端仍能访问清单和历史附件，并以已发布文件的实际名称为准。
+
+## 维护约定
+
+- 对外使用「江大生活 / Jiangda Life」，仓库和 Gradle 项目标识使用 `JiangdaLife`。
+- 学校、趣智校园和趣智后勤热水分别登录。修改账号与缓存逻辑时，保持账号隔离，避免旧请求结果写入新会话。
+- 校园卡扣款以学校流水为准，独立支付的设备消费作为补充。来源待核实的记录不计入支出，同订单避免重复统计。
+- 设备关停以服务端确认的订单状态为准。公开图片及问题报告使用演示数据或遮盖个人资料、付款码和使用码。
