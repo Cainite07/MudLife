@@ -17,8 +17,6 @@
 
 江大生活面向江苏大学学生，可以看课表、出示校园付款码、查生活账单和宿舍电费，也可以扫码出水、查看洗浴和吹风机使用码。
 
-<p align="center"><a href="assets/promo/jiangda-life-social.png">下载完整宣传长图 · 分享给同学</a></p>
-
 ## 四个页面，各有安排
 
 <table>
@@ -78,7 +76,7 @@
 
 国内网络优先使用 [Gitee 发行版](https://gitee.com/cainite/JiangdaLife/releases)，也可从 [GitHub Releases](https://github.com/Cainite07/JiangdaLife/releases) 下载。两端提供相同 APK 与 SHA-256 校验文件；应用启动时自动检查更新，发现新版后会在「我的 → 检查更新」显示绿点。
 
-正式版包名为 `cn.mudlife.app`，沿用固定签名，正常覆盖升级保留本机登录和保存的数据。**1.3.18 之前的旧签名版本不能直接覆盖升级**；切换前请保存所需信息，卸载旧包会清除其数据。
+正常覆盖更新会保留登录信息和本地数据。
 
 ## 开发与反馈
 
@@ -86,13 +84,10 @@ Kotlin 2.0.21 · Compose / Material 3 · Retrofit / OkHttp · MQTT · CameraX / 
 
 ```bash
 ./gradlew testDebugUnitTest assembleDebug
-./gradlew packageReleaseApk
 ```
 
-正式版仅打包 **ARM64（arm64-v8a）**，内置离线扫码模型。v1.5.4 的已发布附件为 `MudLife-1.5.4.apk`。后续正式版本采用 `JiangdaLife-版本号.apk`。
+正式版支持 ARM64（arm64-v8a）设备，内置离线扫码模型。
 
-正式构建需要维护者已有的固定签名，私钥与凭据不在仓库中。详见 [发布指南](docs/RELEASING.md)。
-
-发行构建检查固定证书身份，配置缺失时停止，不会创建替代密钥。GitHub 自动检查运行单元测试；正式发行由维护者同步上传两端。
+构建与发行流程见 [发布指南](docs/RELEASING.md)。
 
 反馈请附版本、系统、操作步骤和错误提示，截图中遮盖个人信息与使用码。本项目采用 [MIT License](LICENSE)。
