@@ -1,10 +1,9 @@
-"""Publish the same signed MudLife release to GitHub and Gitee. No plaintext credentials."""
+"""Publish the same signed Jiangda Life release to GitHub and Gitee."""
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 import urllib.error
@@ -14,7 +13,11 @@ import uuid
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-CERT = '00da3d63a98a2f73565b306c18c67ca2f4fe27fc2ae71599544f96593637c2df'
+CERT = (ROOT / 'signing/release-certificate.sha256').read_text(encoding='ascii').strip()
+GITHUB = 'https://github.com/Cainite07/jiangdalife'
+GITEE = 'https://gitee.com/cainite/jiangdalife'
+REMOTES = {'origin': GITHUB + '.git', 'gitee': GITEE + '.git'}
+USER_AGENT = 'JiangdaLife-release'
 ENV = dict(os.environ, GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='Never')
 
 
@@ -39,12 +42,12 @@ def credential(host):
 class Api:
     def __init__(self, platform, token):
         self.platform, self.token = platform, token
-        self.base = ('https://api.github.com/repos/Cainite07/MudLife' if platform == 'github'
-                     else 'https://gitee.com/api/v5/repos/cainite/MudLife')
+        self.base = ('https://api.github.com/repos/Cainite07/jiangdalife' if platform == 'github'
+                     else 'https://gitee.com/api/v5/repos/cainite/jiangdalife')
 
     def request(self, path, method='GET', values=None, payload=None, content_type=None):
         url = path if path.startswith('https://') else self.base + path
-        headers = {'User-Agent': 'MudLife-release', 'Accept': 'application/json'}
+        headers = {'User-Agent': USER_AGENT, 'Accept': 'application/json'}
         if self.platform == 'github':
             headers['Authorization'] = 'Bearer ' + self.token
             if values is not None:
@@ -71,7 +74,7 @@ class Api:
         existing = next((r for r in releases if r['tag_name'] == tag), None)
         if existing:
             return existing
-        values = dict(tag_name=tag, name=f'MudLife {tag}', body=body, target_commitish=head)
+        values = dict(tag_name=tag, name=f'Jiangda Life {tag}', body=body, target_commitish=head)
         values.update(draft=True, prerelease=False) if self.platform == 'github' else values.update(prerelease='true')
         return self.request('/releases', 'POST', values)
 
@@ -82,6 +85,9 @@ class Api:
         if existing:
             if self.platform == 'github' and existing.get('size') != path.stat().st_size:
                 raise ValueError('Existing release asset differs: ' + path.name)
+            digest = existing.get('digest')
+            if digest and digest != 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest():
+                raise ValueError('Existing release asset hash differs: ' + path.name)
             print(f'{self.platform}: keeping existing {path.name}', flush=True)
             return
         data = path.read_bytes()
@@ -89,7 +95,7 @@ class Api:
             url = release['upload_url'].split('{')[0] + '?' + urllib.parse.urlencode({'name': path.name})
             self.request(url, 'POST', payload=data, content_type='application/octet-stream')
         else:
-            boundary = 'mudlife-' + uuid.uuid4().hex
+            boundary = 'jiangdalife-' + uuid.uuid4().hex
             start = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
                      f'filename="{path.name}"\r\nContent-Type: application/octet-stream\r\n\r\n').encode()
             self.request(suffix, 'POST', payload=start + data + f'\r\n--{boundary}--\r\n'.encode(),
@@ -97,7 +103,7 @@ class Api:
         print(f'{self.platform}: uploaded {path.name}', flush=True)
 
     def publish(self, release, tag, body):
-        values = dict(tag_name=tag, name=f'MudLife {tag}', body=body, prerelease=False)
+        values = dict(tag_name=tag, name=f'Jiangda Life {tag}', body=body, prerelease=False)
         if self.platform == 'github':
             values.update(draft=False, make_latest='true')
         else:
@@ -109,7 +115,7 @@ def verify_download(url, expected_path, direct=False):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({})) if direct else urllib.request.build_opener()
     digest, size = hashlib.sha256(), 0
     try:
-        with opener.open(urllib.request.Request(url, headers={'User-Agent': 'MudLife-release'}), timeout=90) as response:
+        with opener.open(urllib.request.Request(url, headers={'User-Agent': USER_AGENT}), timeout=90) as response:
             while chunk := response.read(1024 * 1024):
                 digest.update(chunk)
                 size += len(chunk)
@@ -121,27 +127,16 @@ def verify_download(url, expected_path, direct=False):
           f'{expected_path.name}, {size} bytes, SHA256 {digest.hexdigest()}', flush=True)
 
 
-def main():
-    os.chdir(ROOT)
-    if git('status', '--porcelain'):
-        raise ValueError('Commit the intended source changes before publishing.')
-    manifest = json.loads((ROOT / 'version.json').read_text(encoding='utf-8'))
-    version, code = manifest['versionName'], manifest['versionCode']
-    gradle = (ROOT / 'app/build.gradle.kts').read_text(encoding='utf-8')
-    if re.search(r'versionName\s*=\s*"([^"]+)"', gradle)[1] != version or int(re.search(r'versionCode\s*=\s*(\d+)', gradle)[1]) != code:
-        raise ValueError('Gradle and version.json disagree.')
-    tag, head = 'v' + version, git('rev-parse', 'HEAD')
-    name = f'MudLife-{version}.apk'
-    gitee_url = f'https://gitee.com/cainite/MudLife/releases/download/{tag}/{name}'
-    github_url = f'https://github.com/Cainite07/MudLife/releases/download/{tag}/{name}'
-    if manifest['downloadUrl'] != github_url or manifest['mirrors'][0] != gitee_url:
-        raise ValueError('Manifest must point to this release, with Gitee first.')
-    apk = ROOT / 'app/build/outputs/apk/release/app-release.apk'
-    sdk = Path(os.environ.get('ANDROID_HOME', r'C:\Android\Sdk')) / 'build-tools/35.0.0'
+def verify_apk(apk, version, code):
+    if not apk.is_file():
+        raise ValueError('Run :app:packageReleaseApk to build the signed distribution APK first.')
+    sdk = Path(os.environ.get('ANDROID_HOME') or os.environ.get('ANDROID_SDK_ROOT') or r'C:\Android\Sdk') / 'build-tools/35.0.0'
     signer = sdk / ('apksigner.bat' if os.name == 'nt' else 'apksigner')
     result = subprocess.run([str(signer), 'verify', '--print-certs', str(apk)],
                             capture_output=True, text=True, encoding='utf-8', env=ENV)
-    if result.returncode or CERT not in result.stdout.lower():
+    certificates = re.findall(r'^signer #\d+ certificate sha-256 digest: ([0-9a-f]+)$',
+                              result.stdout.lower(), flags=re.MULTILINE)
+    if result.returncode or certificates != [CERT]:
         raise ValueError('APK signature does not match the permanent release certificate.')
     aapt = sdk / ('aapt2.exe' if os.name == 'nt' else 'aapt2')
     metadata = subprocess.run([str(aapt), 'dump', 'badging', str(apk)], capture_output=True, text=True, encoding='utf-8')
@@ -163,32 +158,58 @@ def main():
         }
         if any(path not in entries or archive.getinfo(path).file_size == 0 for path in required):
             raise ValueError('APK is missing a required native library or offline barcode model.')
+
+
+def main():
+    os.chdir(ROOT)
+    if git('status', '--porcelain'):
+        raise ValueError('Commit the intended source changes before publishing.')
+    manifest = json.loads((ROOT / 'version.json').read_text(encoding='utf-8'))
+    version, code = manifest['versionName'], manifest['versionCode']
+    gradle = (ROOT / 'app/build.gradle.kts').read_text(encoding='utf-8')
+    if re.search(r'versionName\s*=\s*"([^"]+)"', gradle)[1] != version or int(re.search(r'versionCode\s*=\s*(\d+)', gradle)[1]) != code:
+        raise ValueError('Gradle and version.json disagree.')
+    tag, head = 'v' + version, git('rev-parse', 'HEAD')
+    name = f'JiangdaLife-{version}.apk'
+    gitee_url = f'{GITEE}/releases/download/{tag}/{name}'
+    github_url = f'{GITHUB}/releases/download/{tag}/{name}'
+    if manifest['downloadUrl'] != github_url or (manifest.get('mirrors') or [None])[0] != gitee_url:
+        raise ValueError('Manifest must point to the next Jiangda Life release, with Gitee first. Preserve historical APK names.')
+    target = ROOT / 'app/build/outputs/distribution' / name
+    verify_apk(target, version, code)
     apis = [Api('github', credential('github.com')), Api('gitee', credential('gitee.com'))]
     # Read-only preflight: refuse unrelated branch histories and conflicting tags.
-    for remote in ['origin', 'gitee']:
+    untagged_remotes = []
+    for api, remote in zip(apis, REMOTES):
+        expected_url = REMOTES[remote]
+        if any(git('remote', 'get-url', *options, '--all', remote) != expected_url
+               for options in ((), ('--push',))):
+            raise ValueError(f'{remote}: fetch and push remotes must use {expected_url}.')
+        if api.request('').get('html_url', '').lower() != expected_url[:-4].lower():
+            raise ValueError(f'{api.platform}: canonical repository does not match the release target.')
         git('fetch', remote, 'main')
         git('merge-base', '--is-ancestor', 'FETCH_HEAD', head)
-        remote_tag = git('ls-remote', remote, 'refs/tags/' + tag)
-        if remote_tag and remote_tag.split()[0] != head:
+        ref = 'refs/tags/' + tag
+        remote_tags = dict((ref_name, oid) for oid, ref_name in
+                           (line.split() for line in git('ls-remote', remote, ref, ref + '^{}').splitlines()))
+        if remote_tags and remote_tags.get(ref + '^{}', remote_tags.get(ref)) != head:
             raise ValueError(f'{remote}: existing tag points to a different commit.')
+        if not remote_tags:
+            untagged_remotes.append(remote)
     tags = git('tag', '--list', tag)
     if tags and git('rev-list', '-n', '1', tag) != head:
         raise ValueError('Local version tag belongs to another commit.')
     if not tags:
         git('tag', tag, head)
-    output = ROOT / 'app/build/outputs/dual-release'
-    output.mkdir(exist_ok=True)
-    target = output / name
-    shutil.copyfile(apk, target)
     checksum = hashlib.sha256(target.read_bytes()).hexdigest()
-    sums = output / 'SHA256SUMS.txt'
+    sums = target.with_name('SHA256SUMS.txt')
     sums.write_text(f'{checksum}  {name}\n', encoding='utf-8')
     body = (f"{manifest['changelog']}\n\nAndroid 8.0+ · ARM64 · {version} / {code}\n\n"
             f"安装包：`{name}`。内置离线扫码模型，保留全部现有功能。\n\n"
             f"包名 `cn.mudlife.app`，沿用固定发行签名，支持同签名版本覆盖升级并保留本机数据。\n\n"
             f"源码提交：`{head}`\n\nSHA-256：`{checksum}`\n\n"
             f"[Gitee 国内下载]({gitee_url}) · [GitHub 下载]({github_url})")
-    for remote in ['origin', 'gitee']:
+    for remote in untagged_remotes:
         git('push', remote, 'refs/tags/' + tag)
     releases = [(api, api.release(tag, head, body)) for api in apis]
     for api, release in releases:
@@ -199,18 +220,18 @@ def main():
         verify_download(gitee_url.rsplit('/', 1)[0] + '/' + path.name, path, direct=True)
     for api, release in releases:
         api.publish(release, tag, body)
-    for path in [target, sums]:
-        verify_download(github_url.rsplit('/', 1)[0] + '/' + path.name, path)
-    for remote in ['origin', 'gitee']:
+    for url, direct in ((gitee_url, True), (github_url, False)):
+        for path in [target, sums]:
+            verify_download(url.rsplit('/', 1)[0] + '/' + path.name, path, direct=direct)
+    for api, release in releases:
+        final = api.request(f"/releases/{release['id']}")
+        if final.get('draft') or final.get('prerelease') or final['tag_name'] != tag or final['name'] != f'Jiangda Life {tag}':
+            raise ValueError(api.platform + ': release is not final.')
+    for remote in REMOTES:
         git('push', remote, head + ':refs/heads/main')
         if git('ls-remote', remote, 'refs/heads/main').split()[0] != head:
             raise ValueError(remote + ': main verification failed.')
-    for api, release in releases:
-        final = api.request(f"/releases/{release['id']}")
-        if final.get('draft') or final.get('prerelease') or final['tag_name'] != tag:
-            raise ValueError(api.platform + ': release is not final.')
-    print(f'Published {tag}, commit {head}\nhttps://github.com/Cainite07/MudLife/releases/tag/{tag}\n'
-          f'https://gitee.com/cainite/MudLife/releases/tag/{tag}', flush=True)
+    print(f'Published {tag}, commit {head}\n{GITHUB}/releases/tag/{tag}\n{GITEE}/releases/tag/{tag}', flush=True)
 
 
 if __name__ == '__main__':

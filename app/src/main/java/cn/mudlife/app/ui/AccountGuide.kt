@@ -1,5 +1,6 @@
 package cn.mudlife.app.ui
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -84,7 +85,7 @@ internal fun AccountGuide(
                     scaleY = scaleX
                 })
                 Spacer(Modifier.height(17.dp))
-                Text("江大生活", Modifier.reveal(clock, .47f, .73f).semantics { heading() },
+                Text(stringResource(R.string.app_name), Modifier.reveal(clock, .47f, .73f).semantics { heading() },
                     color = AppColors.TextPrimary, fontFamily = FontFamily.Serif,
                     fontSize = 30.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(sectionGap))

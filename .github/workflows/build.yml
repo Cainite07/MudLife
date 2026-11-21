@@ -1,4 +1,4 @@
-name: Build MudLife APK
+name: Build Jiangda Life APK
 
 on:
   push:
@@ -39,8 +39,8 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           test -n "$KEYSTORE_BASE64" || { echo "Missing permanent release keystore secret"; exit 1; }
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/mudlife-release-2026.p12"
-          echo "MUDLIFE_KEYSTORE_FILE=$RUNNER_TEMP/mudlife-release-2026.p12" >> "$GITHUB_ENV"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/jiangdalife-release.p12"
+          echo "MUDLIFE_KEYSTORE_FILE=$RUNNER_TEMP/jiangdalife-release.p12" >> "$GITHUB_ENV"
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
@@ -51,11 +51,12 @@ jobs:
           MUDLIFE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           MUDLIFE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           MUDLIFE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew packageReleaseApk --stacktrace
 
       - name: Upload Release APK
         if: github.event_name == 'workflow_dispatch' && inputs.build_release
         uses: actions/upload-artifact@v4
         with:
-          name: mudlife-release
-          path: app/build/outputs/apk/release/*.apk
+          name: JiangdaLife-release
+          path: app/build/outputs/distribution/JiangdaLife-*.apk
+          if-no-files-found: error

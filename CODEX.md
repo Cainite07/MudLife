@@ -7,7 +7,7 @@
 - Kotlin / Jetpack Compose / Material 3 安卓应用，最低支持Android 8.0。
 - 正式包名：`cn.mudlife.app`；调试包使用独立的`.refresh`后缀。
 - 正式版默认仅打包ARM64（`arm64-v8a`），保留全部现有功能与内置离线扫码模型。
-- 软件名称为“江大生活 / Jiangda Life”；GitHub与Gitee仓库继续使用MudLife路径。
+- 项目正式品牌为「江大生活 / Jiangda Life」。仓库、构建、发布命名及历史兼容以 [AGENTS.md](AGENTS.md) 为准。
 - 保持暖纸黄与墨绿配色，优先改善布局层次、操作效率和轻量反馈。
 
 ## 核心结构
@@ -48,14 +48,15 @@
 
 ```shell
 ./gradlew testDebugUnitTest
-./gradlew assembleRelease
+./gradlew :app:packageReleaseApk
 python scripts/publish_release.py
 ```
 
 - 沿用永久发行签名；密钥或凭据缺失时停止构建，不生成替代密钥。私钥和令牌不进入仓库。
 - 固定证书SHA-256：`00da3d63a98a2f73565b306c18c67ca2f4fe27fc2ae71599544f96593637c2df`。
-- 正式文件名统一为`MudLife-版本号.apk`，不带架构或预览后缀。两端使用同一提交、标签、APK和校验文件。
+- 新版正式文件名统一为 `JiangdaLife-版本号.apk`。两端使用同一提交、标签、APK 和校验文件。已发行版本的附件保留原名。
 - 发布前核对包名、版本、证书、ARM64库和全部离线扫码模型；发布后核对GitHub/Gitee附件大小与SHA-256。
+- Windows 中文账户路径下若出现 `GradleWorkerMain` 找不到，临时用 `subst` 映射账户目录，通过该盘符进入工程，并将本次构建的 `GRADLE_USER_HOME` 指向同一盘符下的 `.gradle`。测试结束后解除映射。
 - Gradle、version.json、README和CHANGELOG保持一致。更新清单中的GitHub地址与Gitee镜像均指向对应正式附件。
 - 公共文档只保留产品变化和可复用的技术信息，不记录协作对话、授权过程、个人设备标识、调试地址或账号明细。
 - 详细流程见[双平台发布](docs/RELEASING.md)。
@@ -71,4 +72,4 @@ python scripts/publish_release.py
 - 横版宣传图统一为1600×1000，社交长图为1080×3800；共用固定设备比例与界面组件。
 - 采用浅色分层边框，不绘制底部手势线；页脚简写“演示数据”。
 - 所有宣传数据为虚构示例，付款码与使用码隐藏，不使用真实账号或设备记录。
-- 固定模板为`scripts/render_promos.py`；已导出的品牌名称替换图保留原排版。
+- 固定模板为 `scripts/render_promos.py`。发布前检查生成图片中的品牌、仓库地址和下载二维码。

@@ -51,7 +51,7 @@ internal class UpdateDownloader(private val client: OkHttpClient) {
     @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun openFastest(urls: List<String>): Transfer = suspendCancellableCoroutine { continuation ->
         val calls = urls.map { url -> client.newCall(Request.Builder().url(url)
-            .header("User-Agent", "MudLife-App").build()) }
+            .header("User-Agent", "JiangdaLife-App").build()) }
         val claimed = AtomicBoolean(false)
         val pending = AtomicInteger(calls.size)
         continuation.invokeOnCancellation { calls.forEach(Call::cancel) }

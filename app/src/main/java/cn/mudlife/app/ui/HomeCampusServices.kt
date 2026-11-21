@@ -1,5 +1,7 @@
 package cn.mudlife.app.ui
 
+import androidx.compose.ui.res.stringResource
+import cn.mudlife.app.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -39,7 +41,7 @@ private val homeDateFormat = DateTimeFormatter.ofPattern("M月d日 · E", Locale
 
 @Composable
 internal fun HomePageHeader() {
-    PageTitle("江大生活", padded = false) {
+    PageTitle(stringResource(R.string.app_name), padded = false) {
         Text(LocalDate.now().format(homeDateFormat), fontSize = 12.sp, color = AppColors.TextSecondary)
     }
 }

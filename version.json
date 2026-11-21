@@ -4,8 +4,8 @@
   "releaseDate": "2026-11-19",
   "title": "江大生活 · Jiangda Life v1.5.4",
   "changelog": "· 课表的「更多功能」新增「考试信息查询」。按学期查看已同步的考试时间、考场等信息，已保存的安排可离线查看。\n· 考试同步复用本科教务登录。会话有效时，点一下即可查询并保存。会话失效时，完成学校验证后自动继续查询。\n· 考试列表统一课程名字体，学期集中在页首显示。移除课表工具菜单中重复的「添加课程」入口，右上角加号仍可添加课程。",
-  "downloadUrl": "https://github.com/Cainite07/MudLife/releases/download/v1.5.4/MudLife-1.5.4.apk",
+  "downloadUrl": "https://github.com/Cainite07/jiangdalife/releases/download/v1.5.4/MudLife-1.5.4.apk",
   "mirrors": [
-    "https://gitee.com/cainite/MudLife/releases/download/v1.5.4/MudLife-1.5.4.apk"
+    "https://gitee.com/cainite/jiangdalife/releases/download/v1.5.4/MudLife-1.5.4.apk"
   ]
 }

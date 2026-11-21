@@ -1,35 +1,18 @@
 @echo off
+setlocal
 chcp 65001 >nul
-echo ========================================================
-echo         MudLife 一键极速编译与真机热更新
-echo ========================================================
+cd /d "%~dp0" || exit /b 1
+echo 江大生活 · Jiangda Life 真机覆盖安装
 
-echo [1/3] 本地增量编译 Release APK...
-call gradlew.bat assembleRelease
-if errorlevel 1 (
-    echo [错误] 编译失败，请检查报错日志。
-    pause
-    exit /b 1
-)
+call gradlew.bat --no-daemon -Pkotlin.compiler.execution.strategy=in-process packageReleaseApk
+if errorlevel 1 exit /b 1
 
-echo [2/3] 自动探测并连接设备...
-python "C:\工具\platform-tools\adb_auto_connect.py"
+set "APK="
+for %%F in ("app\build\outputs\distribution\JiangdaLife-*.apk") do if exist "%%~fF" set "APK=%%~fF"
+if not defined APK exit /b 1
 
-set DEV=192.168.1.106:5555
-if exist "C:\工具\platform-tools\last_endpoint.txt" (
-    set /p DEV=<"C:\工具\platform-tools\last_endpoint.txt"
-)
-
-echo [3/3] 推送并覆盖安装至手机 (%DEV%)...
-"C:\工具\platform-tools\adb.exe" connect %DEV% >nul 2>&1
-"C:\工具\platform-tools\adb.exe" -s %DEV% install -r "app\build\outputs\apk\release\app-release.apk"
-
-if errorlevel 1 (
-    echo [提示] 正在重新建连并重试...
-    "C:\工具\platform-tools\adb.exe" connect 192.168.1.106:5555
-    "C:\工具\platform-tools\adb.exe" -s 192.168.1.106:5555 install -r "app\build\outputs\apk\release\app-release.apk"
-)
-
-echo.
-echo [成功] MudLife APK 已无缝覆盖安装到手机！
-pause
+set "DEV="
+for /f "delims=" %%D in ('python "C:\工具\adb\adb_auto_connect.py" endpoint %*') do set "DEV=%%D"
+if not defined DEV exit /b 1
+"C:\工具\adb\adb.exe" -s "%DEV%" install -r "%APK%"
+exit /b %errorlevel%

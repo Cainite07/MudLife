@@ -52,7 +52,7 @@ data class LogEntry(
 }
 
 object AppLogger {
-    private const val TAG = "MudLife"
+    private const val TAG = "Jiangda Life"
     private const val MAX_MEMORY_LOGS = 1000
     private const val MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB 自动滚动截断
 
